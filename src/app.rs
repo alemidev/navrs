@@ -89,6 +89,8 @@ impl App {
 								KeyCode::PageDown => {
 									self.scroll = self.scroll.saturating_sub(1);
 								}
+								KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
+								KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
 								KeyCode::Up => {
 									self.tab_state.table.select(Some(
 										self.tab_state

@@ -22,6 +22,13 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn queue(&self) -> Vec<sunk::song::Song>;
 	fn enqueue(&self, song: Vec<sunk::song::Song>);
 	fn clear_queue(&self);
+	fn seek(&self, percentage: f32);
+
+	fn skip(&self, amount: f32) {
+		self.seek(
+			self.progress() + amount.clamp(-1., 1.)
+		);
+	}
 
 	fn shuffle_liked(&self) {
 		let mut queue = self.likes();
@@ -198,6 +205,12 @@ impl MusicProvider<f32> for SubsonicProvider {
 			return true;
 		}
 		false
+	}
+
+	fn seek(&self, percentage: f32) {
+		let mut buffer = self.0.buffer.lock().unwrap();
+		let total = buffer.buf.len() as f32;
+		buffer.offset = (total * percentage) as usize;
 	}
 }
 

@@ -1,6 +1,6 @@
-use ratatui::{DefaultTerminal, Frame, crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers}, layout::{Constraint, Layout}, style::{Color, Style, Stylize}, text::Text, widgets::{Bar, Block, Gauge, Paragraph, TableState, Tabs, Widget, Wrap}};
+use ratatui::{DefaultTerminal, Frame, crossterm::event::{self, Event, KeyCode, KeyModifiers}, layout::{Constraint, Layout}, style::{Style, Stylize}, widgets::{Block, Paragraph, Tabs}};
 
-use crate::{audio::AudioSink, music::{MusicProvider, SubsonicProvider}, ui::likes::LikesTabState};
+use crate::{music::{MusicProvider, SubsonicProvider}, ui::likes::LikesTabState};
 
 const SUBTUI : &str = r#"    _   /__/_   .
   _\/_//_// /_// "#;
@@ -14,7 +14,6 @@ const SUBTUI_WORKING_B : &str = r#"    _   /__/_   .   |___   ___   ___   ___   
 
 pub struct App {
 	pub provider: SubsonicProvider,
-	pub sink: AudioSink,
 	pub scroll: u16,
 	pub tab: usize,
 
@@ -23,8 +22,8 @@ pub struct App {
 }
 
 impl App {
-	pub fn new(provider: SubsonicProvider, sink: AudioSink) -> Self {
-		Self { provider, sink, scroll: 0, tab: 0, tab_state: LikesTabState::default(), flip_flop: false }
+	pub fn new(provider: SubsonicProvider) -> Self {
+		Self { provider, scroll: 0, tab: 0, tab_state: LikesTabState::default(), flip_flop: false }
 	}
 
 	pub fn run(mut self, mut term: DefaultTerminal) -> sunk::Result<()> {

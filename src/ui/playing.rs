@@ -1,4 +1,4 @@
-use ratatui::{layout::{Constraint, Layout}, style::Stylize, text::{Line, Span, ToSpan}, widgets::{Block, Padding, Paragraph, Widget, Wrap}};
+use ratatui::{layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}};
 
 
 pub struct PlayingTab(pub Option<sunk::song::Song>);

@@ -3,17 +3,14 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[derive(Debug, thiserror::Error)]
 pub enum AudioSinkError {
 	#[error("stream config error: {0}")]
-	DefaultStreamConfigError(#[from] cpal::DefaultStreamConfigError),
+	DefaultStreamConfig(#[from] cpal::DefaultStreamConfigError),
 
 	#[error("error building stream: {0}")]
-	BuildStreamError(#[from] cpal::BuildStreamError),
-}
+	BuildStream(#[from] cpal::BuildStreamError),
 
-pub trait AudioController {
-	fn play(&mut self);
-	fn pause(&mut self);
+	#[error("play stream error: {0}")]
+	PlayStream(#[from] cpal::PlayStreamError),
 }
-
 
 pub struct AudioSink {
 	stream: cpal::Stream,
@@ -37,16 +34,8 @@ impl AudioSink {
 			None,
 		)?;
 
+		stream.play()?;
+
 		Ok(Self { stream })
-	}
-}
-
-impl AudioController for AudioSink {
-	fn play(&mut self) {
-		self.stream.play();
-	}
-
-	fn pause(&mut self) {
-		self.stream.pause();
 	}
 }

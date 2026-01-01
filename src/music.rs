@@ -106,9 +106,7 @@ impl MusicProvider<f32> for SubsonicProvider {
 	fn progress(&self) -> f32 {
 		if self.0.song.read().unwrap().is_none() { return 0. }
 		let buf = self.0.buffer.lock().unwrap();
-		(buf.offset as f32 / buf.buf.len() as f32)
-			.min(1.)
-			.max(0.)
+		(buf.offset as f32 / buf.buf.len() as f32).clamp(0., 1.)
 	}
 
 	fn play(&self, song: sunk::song::Song) {

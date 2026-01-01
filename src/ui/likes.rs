@@ -35,7 +35,7 @@ impl StatefulWidget for LikesTab {
 fn song_into_row<'a>(song: sunk::song::Song) -> Row<'a> {
 	Row::new([
 		song.title.clone(),
-		song.artist.as_ref().map(|x| x.clone()).unwrap_or_default(),
-		song.album.as_ref().map(|x| x.clone()).unwrap_or_default(),
+		song.artist.clone().unwrap_or_default(),
+		song.album.clone().unwrap_or_default(),
 	]).white()
 }

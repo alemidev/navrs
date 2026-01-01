@@ -7,8 +7,6 @@ mod ui;
 
 use clap::Parser;
 
-use crate::audio::AudioController;
-
 /// A TUI Subsonic music player
 #[derive(Parser)]
 struct Cli {
@@ -30,11 +28,10 @@ fn main() {
 	let cli = Cli::parse();
 
 	let provider = music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
-	let mut sink = audio::AudioSink::init(provider.clone()).unwrap();
-	sink.play();
+	let _sink = audio::AudioSink::init(provider.clone()).unwrap();
 
 	let term = ratatui::init();
-	let res = app::App::new(provider, sink).run(term);
+	let res = app::App::new(provider).run(term);
 	ratatui::restore();
 
 	res.unwrap();

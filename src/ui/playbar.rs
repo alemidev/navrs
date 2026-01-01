@@ -34,11 +34,12 @@ impl Widget for Playbar<SubsonicProvider> {
 		])
 		.areas(up);
 
+		let song = self.0.current_song();
+
 		Paragraph::new(
 			"artist: ".dark_gray()
-				+ self
-					.0
-					.song()
+				+ song
+					.as_ref()
 					.and_then(|x| x.artist.clone())
 					.unwrap_or("".to_string())
 					.red(),
@@ -48,9 +49,7 @@ impl Widget for Playbar<SubsonicProvider> {
 
 		Paragraph::new(
 			"album: ".dark_gray()
-				+ self
-					.0
-					.song()
+				+ song
 					.as_ref()
 					.and_then(|x| x.album.clone())
 					.unwrap_or("".to_string())
@@ -62,9 +61,7 @@ impl Widget for Playbar<SubsonicProvider> {
 
 		Paragraph::new(
 			"title: ".dark_gray()
-				+ self
-					.0
-					.song()
+				+ song
 					.as_ref()
 					.map(|x| x.title.clone())
 					.unwrap_or("".to_string())
@@ -73,11 +70,26 @@ impl Widget for Playbar<SubsonicProvider> {
 		.centered()
 		.wrap(Wrap { trim: true })
 		.render(title, buf);
+		
+		let [now, bar, end] = Layout::horizontal([Constraint::Min(5), Constraint::Percentage(100), Constraint::Min(5)]).areas(down);
+
+		let duration = song.and_then(|s| s.duration).unwrap_or_default();
+		let current_time = (duration as f32 * self.0.progress()) as u64;
+		let remaining = duration - current_time;
+
+		Paragraph::new(format!("{}.{:02}", current_time / 60, current_time % 60))
+			.dark_gray()
+			.render(now, buf);
+
+		Paragraph::new(format!("{}.{:02}", duration / 60, duration % 60))
+			.right_aligned()
+			.dark_gray()
+			.render(end, buf);
 
 		Gauge::default()
 			.gauge_style(Color::Red)
 			.ratio(self.0.progress() as f64)
-			.label("")
-			.render(down, buf);
+			.label(format!("{}.{:02}", remaining / 60, remaining % 60))
+			.render(bar, buf);
 	}
 }

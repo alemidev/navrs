@@ -14,11 +14,6 @@ use crate::{
 const SUBTUI: &str = r#"    _   /__/_   .
   _\/_//_// /_// "#;
 
-const SUBTUI_WORKING_A: &str = r#"    _   /__/_   .        ___   ___   ___   ___   ___   |
-  _\/_//_// /_//    |                                 "#;
-const SUBTUI_WORKING_B: &str = r#"    _   /__/_   .   |___   ___   ___   ___   ___   ___
-  _\/_//_// /_//                                      |"#;
-
 pub struct App {
 	pub provider: SubsonicProvider,
 	pub scroll: u16,
@@ -40,6 +35,8 @@ impl App {
 	}
 
 	pub fn run(mut self, mut term: DefaultTerminal) -> sunk::Result<()> {
+		self.provider.likes(); // preload them
+
 		loop {
 			self.flip_flop = !self.flip_flop;
 
@@ -64,6 +61,7 @@ impl App {
 							};
 							match key_event.code {
 								KeyCode::Char('q') => return Ok(()),
+								KeyCode::Char('n') => { self.provider.next(); },
 								KeyCode::Char('1') => {
 									self.tab = 0;
 								}
@@ -82,7 +80,7 @@ impl App {
 								KeyCode::Char(' ') => {
 									self.provider.toggle();
 								}
-								KeyCode::Char('n') => {
+								KeyCode::Char('?') => {
 									self.provider.random_song()?;
 								}
 								KeyCode::PageUp => {
@@ -112,10 +110,24 @@ impl App {
 								KeyCode::Tab => {
 									self.tab = (self.tab + 1) % 5;
 								}
+								KeyCode::Char('+') => {
+									if self.tab == 1 {
+										let idx = self.tab_state.table.selected().unwrap_or_default();
+										if let Some(song) = self.provider.likes().get(idx) {
+											self.provider.enqueue(vec![song.clone()]);
+										}
+									}
+								},
 								KeyCode::Enter => {
-									let idx = self.tab_state.table.selected().unwrap_or_default();
-									if let Some(song) = self.provider.likes().get(idx) {
-										self.provider.play(song.clone());
+									match self.tab {
+										0 => self.provider.shuffle_liked(),
+										1 => {
+											let idx = self.tab_state.table.selected().unwrap_or_default();
+											if let Some(song) = self.provider.likes().get(idx) {
+												self.provider.play(song.clone());
+											}
+										},
+										_ => {},
 									}
 								}
 								_ => {}
@@ -150,21 +162,21 @@ impl App {
 			.gray();
 		frame.render_widget(t, tabbar);
 
-		let subtui = if self.provider.working() {
-			Paragraph::new(if self.flip_flop {
-				SUBTUI_WORKING_A
+		let mut subtui = Paragraph::new(SUBTUI);
+		if self.provider.working() {
+			if self.flip_flop {
+				subtui = subtui.dark_gray();
 			} else {
-				SUBTUI_WORKING_B
-			})
-			.dark_gray()
+				subtui = subtui.red();
+			}
 		} else {
-			Paragraph::new(SUBTUI).bold().red()
+			subtui = subtui.red().bold();
 		};
 		frame.render_widget(subtui, title);
 
 		match self.tab {
 			0 => frame.render_widget(
-				crate::ui::playing::PlayingTab(self.provider.song()),
+				crate::ui::playing::PlayingTab(self.provider.current_song(), self.provider.queue()),
 				content,
 			),
 			1 => frame.render_stateful_widget(

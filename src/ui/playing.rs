@@ -5,7 +5,7 @@ use ratatui::{
 	widgets::{Block, Padding, Paragraph, Widget, Wrap},
 };
 
-pub struct PlayingTab(pub Option<sunk::song::Song>);
+pub struct PlayingTab(pub Option<sunk::song::Song>, pub Vec<sunk::song::Song>);
 
 impl Widget for PlayingTab {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
@@ -27,20 +27,25 @@ impl Widget for PlayingTab {
 		])
 		.areas(main);
 
-		let up_next = vec![
-			Line::from("next song"),
-			Line::from("even further song"),
-			Line::from("wow so many songs"),
-		];
+		let up_next= self.1.into_iter().enumerate().map(|(i, s)| {
+			let txt = format!("{} - {} ({})", s.title, s.artist.as_deref().unwrap_or_default(), s.album.as_deref().unwrap_or_default());
+			if i == 0 {
+				Line::from(txt.gray().bold())
+			} else {
+				Line::from(txt.italic())
+			}
+		}).collect::<Vec<Line>>();
 
-		let queue_box = Block::new().padding(Padding::uniform(2));
+		let queue_box = Block::new().padding(Padding::uniform(content.height / 10));
 		Paragraph::new(up_next)
 			.block(queue_box)
 			.right_aligned()
 			.dark_gray()
 			.render(queue, buf);
 
-		let border = Block::bordered().padding(Padding::vertical(5)).red();
+		let border = Block::bordered()
+			.padding(Padding::new(2, 2, content.height / 5, content.height / 5))
+			.red();
 
 		let info = if let Some(song) = self.0 {
 			vec![

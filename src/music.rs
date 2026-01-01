@@ -1,16 +1,35 @@
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::{Arc, OnceLock}};
 
+use dashmap::DashMap;
+use rand::seq::SliceRandom;
 use sunk::{Streamable, song::Song};
 
+// TODO huge trait, more default or split it down!!
 pub trait MusicProvider<T>: Send + Clone {
 	fn data(&self, len: usize) -> Option<Vec<T>>; // TODO cloneless??
-	fn song(&self) -> Option<sunk::song::Song>;
+
+	fn current_song(&self) -> Option<sunk::song::Song>;
 	fn likes(&self) -> Vec<sunk::song::Song>;
+
 	fn progress(&self) -> f32;
 	fn working(&self) -> bool;
 	fn running(&self) -> bool;
-	fn play(&self, song: sunk::song::Song);
+
 	fn toggle(&self);
+	fn play(&self, song: sunk::song::Song);
+	fn next(&self) -> bool;
+
+	fn queue(&self) -> Vec<sunk::song::Song>;
+	fn enqueue(&self, song: Vec<sunk::song::Song>);
+	fn clear_queue(&self);
+
+	fn shuffle_liked(&self) {
+		let mut queue = self.likes();
+		queue.shuffle(&mut rand::rng());
+		self.clear_queue();
+		self.enqueue(queue);
+		self.next();
+	}
 }
 
 #[derive(Clone)]
@@ -23,6 +42,7 @@ struct SubsonicProviderInner {
 	tx: std::sync::mpsc::Sender<Op>,
 	working: Arc<std::sync::atomic::AtomicBool>,
 	running: Arc<std::sync::atomic::AtomicBool>,
+	queue: std::sync::RwLock<VecDeque<sunk::song::Song>>,
 }
 
 struct SyncLikes {
@@ -47,6 +67,7 @@ impl SubsonicProvider {
 		let offset = 0;
 		let buffer = std::sync::Mutex::new(SyncBuffer { buf, offset });
 		let song = std::sync::RwLock::new(None);
+		let queue = std::sync::RwLock::new(VecDeque::new());
 		let likes = std::sync::RwLock::new(SyncLikes {
 			songs: vec![],
 			updated: std::time::SystemTime::UNIX_EPOCH,
@@ -63,6 +84,7 @@ impl SubsonicProvider {
 			tx,
 			running,
 			working: working.clone(),
+			queue,
 		});
 		let ctx = inner.clone();
 
@@ -94,7 +116,12 @@ impl MusicProvider<f32> for SubsonicProvider {
 			return None;
 		}
 
+		// finished, load next?
 		if buffer.offset + len > buffer.buf.len() {
+			if self.0.running.load(std::sync::atomic::Ordering::Relaxed) {
+				self.next();
+				self.0.running.store(false, std::sync::atomic::Ordering::Relaxed);
+			}
 			return None;
 		}
 
@@ -104,7 +131,7 @@ impl MusicProvider<f32> for SubsonicProvider {
 		Some(data)
 	}
 
-	fn song(&self) -> Option<sunk::song::Song> {
+	fn current_song(&self) -> Option<sunk::song::Song> {
 		self.0.song.read().unwrap().clone()
 	}
 
@@ -128,6 +155,9 @@ impl MusicProvider<f32> for SubsonicProvider {
 
 	fn play(&self, song: sunk::song::Song) {
 		self.0.tx.send(Op::PlaySong(song));
+		if let Some(song) = self.0.queue.read().unwrap().get(0) {
+			self.0.tx.send(Op::Preload(song.clone()));
+		}
 	}
 
 	fn working(&self) -> bool {
@@ -144,44 +174,53 @@ impl MusicProvider<f32> for SubsonicProvider {
 			.running
 			.store(!prev, std::sync::atomic::Ordering::Relaxed);
 	}
+
+	fn enqueue(&self, songs: Vec<sunk::song::Song>) {
+		let mut q = self.0.queue.write().unwrap();
+		for s in songs {
+			q.push_back(s);
+		}
+	}
+
+	fn clear_queue(&self) {
+		self.0.queue.write().unwrap().clear();
+	}
+
+	fn queue(&self) -> Vec<sunk::song::Song> {
+		// TODO lmao whats this can it be better?
+		self.0.queue.read().unwrap().iter().cloned().collect()
+	}
+
+	fn next(&self) -> bool {
+		let res = self.0.queue.write().unwrap().pop_front();
+		if let Some(song) = res {
+			self.play(song);
+			return true;
+		}
+		false
+	}
 }
 
 enum Op {
 	PlaySong(sunk::song::Song),
+	Preload(sunk::song::Song),
 	RefreshLikes,
 }
 
-fn work(
-	ctx: Arc<SubsonicProviderInner>,
-	rx: std::sync::mpsc::Receiver<Op>,
-	working: Arc<std::sync::atomic::AtomicBool>,
-) {
-	while let Ok(op) = rx.recv() {
-		working.store(true, std::sync::atomic::Ordering::Relaxed);
-		match op {
-			Op::PlaySong(mut song) => {
-				song.set_max_bit_rate(320); // TODO make configurable
-				song.set_transcoding("mp3");
+fn cache() -> &'static DashMap<sunk::id::Id, Vec<f32>> {
+	static CACHE: OnceLock<DashMap<sunk::id::Id, Vec<f32>>> = OnceLock::new();
+	CACHE.get_or_init(DashMap::default)
+}
 
-				let mut temp = Vec::new();
-				if match song.stream(&ctx.client) {
-					Ok(mut reader) => match reader.read_to_end(&mut temp) {
-						Ok(n) => {
-							log::info!("streamed {n} bytes");
-							true
-						}
-						Err(e) => {
-							log::error!("error copying streamed data: {e}");
-							false
-						}
-					},
-					Err(e) => {
-						log::error!("error requesting song stream: {e}");
-						false
-					}
-				} {
-					*ctx.song.write().unwrap() = Some(song.clone());
-
+fn preload(song: &sunk::song::Song, client: &sunk::Client) -> bool {
+	if !cache().contains_key(&song.id) {
+		log::info!("preloading {song}");
+		let mut temp = Vec::new();
+		match song.stream(client) {
+			Err(e) => { log::error!("error requesting song stream: {e}"); false },
+			Ok(mut reader) => match reader.read_to_end(&mut temp) {
+				Err(e) => { log::error!("error copying streamed data: {e}"); false },
+				Ok(_n) => {
 					let mut decoder = rmp3::Decoder::new(&temp);
 					let mut out = Vec::new();
 					while let Some(frame) = decoder.next() {
@@ -192,17 +231,47 @@ fn work(
 									out.push(*sample);
 								}
 							}
-							rmp3::Frame::Other(_data) => log::warn!("skipping other data in mp3"),
+							rmp3::Frame::Other(_data) => {},
 						}
 					}
-					log::info!("parsed {} bytes", out.len());
+
+					cache().insert(song.id.clone(), out);
+					true
+				},
+			},
+		}
+	} else {
+		true
+	}
+}
+
+fn work(
+	ctx: Arc<SubsonicProviderInner>,
+	rx: std::sync::mpsc::Receiver<Op>,
+	working: Arc<std::sync::atomic::AtomicBool>,
+) {
+	while let Ok(op) = rx.recv() {
+		working.store(true, std::sync::atomic::Ordering::Relaxed);
+		match op {
+			Op::Preload(song) => {
+				preload(&song, &ctx.client);
+			},
+			Op::PlaySong(mut song) => {
+				song.set_max_bit_rate(320); // TODO make configurable
+				song.set_transcoding("mp3");
+
+				preload(&song, &ctx.client);
+
+				if let Some(data) = cache().get(&song.id) {
+					*ctx.song.write().unwrap() = Some(song.clone());
 
 					ctx.running
 						.store(true, std::sync::atomic::Ordering::Relaxed);
 
+					log::info!("playing {song}");
 					let mut buffer = ctx.buffer.lock().unwrap();
 					buffer.offset = 0;
-					buffer.buf = out;
+					buffer.buf = data.value().clone();
 				}
 			}
 			Op::RefreshLikes => match ctx.client.starred(1) {

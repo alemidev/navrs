@@ -61,7 +61,7 @@ impl App {
 							};
 							match key_event.code {
 								KeyCode::Char('q') => return Ok(()),
-								KeyCode::Char('n') => { self.provider.next(); },
+								KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
 								KeyCode::Char('1') => {
 									self.tab = 0;
 								}
@@ -83,6 +83,7 @@ impl App {
 								KeyCode::Char('?') => {
 									self.provider.random_song()?;
 								}
+								KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
 								KeyCode::PageUp => {
 									self.scroll = self.scroll.saturating_add(1);
 								}

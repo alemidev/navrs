@@ -24,6 +24,10 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn clear_queue(&self);
 	fn seek(&self, percentage: f32);
 
+	fn restart(&self) {
+		self.seek(0.);
+	}
+
 	fn skip(&self, amount: f32) {
 		self.seek(
 			self.progress() + amount.clamp(-1., 1.)

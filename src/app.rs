@@ -187,7 +187,7 @@ impl App {
 				&mut self.tab_state,
 			),
 			2 => frame.render_widget(crate::ui::library::LibraryTab, content),
-			3 => frame.render_widget(crate::ui::queue::QueueTab, content),
+			3 => frame.render_widget(crate::ui::queue::QueueTab(self.provider.queue()), content),
 			4 => frame.render_widget(crate::ui::logs::LogsTab(self.scroll), content),
 			_ => frame.render_widget(Block::bordered().title("wrong tab index").red(), content),
 		}

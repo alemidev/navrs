@@ -1931,6 +1931,7 @@ dependencies = [
 [[package]]
 name = "sunk"
 version = "0.1.2"
+source = "git+https://github.com/xeals/sunk?rev=d07639b5f07aeaba015ef68d343848038230687b#d07639b5f07aeaba015ef68d343848038230687b"
 dependencies = [
  "failure",
  "log",

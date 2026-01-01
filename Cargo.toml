@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.53", features = ["derive"] }
-cpal = "0.17.0"
-env_logger = "0.11.8"
-log = "0.4.29"
-rmp3 = { version = "0.3.1", features = ["float"] }
-sunk = { path = "../../fork/sunk/" }
-thiserror = "2.0.17"
+clap = { version = "4.5", features = ["derive"] }
+cpal = "0.17"
+env_logger = "0.11"
+log = "0.4"
+rmp3 = { version = "0.3", features = ["float"] }
+sunk = { git = "https://github.com/xeals/sunk", rev = "d07639b5f07aeaba015ef68d343848038230687b" }
+thiserror = "2.0"

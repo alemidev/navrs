@@ -29,11 +29,11 @@ impl Widget for PlayingTab {
 		let info = if let Some(song) = self.0 {
 			vec![
 				Line::from(song.title.clone().red()),
-				Line::from(
-					song.artist.as_deref().unwrap_or("?").to_string().white()
-					+ " - ".dark_gray()
-					+ song.album.as_deref().unwrap_or("?").to_string().gray()
-				)
+				Line::from(song.artist.as_deref().unwrap_or("?").to_string().white()),
+				Line::from(song.album.as_deref().unwrap_or("?").to_string().gray()),
+				Line::from(""),
+				Line::from(format!("#{} - {}", song.track.unwrap_or_default(), song.year.unwrap_or_default()).gray()),
+				Line::from(song.content_type.clone().dark_gray()),
 			]
 		} else {
 			vec![]

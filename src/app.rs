@@ -1,4 +1,4 @@
-use ratatui::{DefaultTerminal, Frame, crossterm::event::{self, Event, KeyCode, KeyEventKind}, layout::{Constraint, Layout}, style::{Color, Style, Stylize}, text::Text, widgets::{Bar, Block, Gauge, Paragraph, TableState, Tabs, Widget, Wrap}};
+use ratatui::{DefaultTerminal, Frame, crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers}, layout::{Constraint, Layout}, style::{Color, Style, Stylize}, text::Text, widgets::{Bar, Block, Gauge, Paragraph, TableState, Tabs, Widget, Wrap}};
 
 use crate::{audio::AudioSink, music::{MusicProvider, SubsonicProvider}, ui::likes::LikesTabState};
 
@@ -44,21 +44,30 @@ impl App {
 						Event::Paste(_) => {},
 						Event::Resize(_, _) => {},
 						Event::Mouse(_mouse_event) => {},
-						Event::Key(key_event) => match key_event.code {
-							KeyCode::Char('q') => return Ok(()),
-							KeyCode::Char('n') => { self.provider.random_song()?; },
-							KeyCode::PageUp => { self.scroll = self.scroll.saturating_add(1); },
-							KeyCode::PageDown => { self.scroll = self.scroll.saturating_sub(1); },
-							KeyCode::Up => { self.tab_state.table.select_previous(); },
-							KeyCode::Down => { self.tab_state.table.select_next(); },
-							KeyCode::Tab => { self.tab = (self.tab + 1) % 5; }
-							KeyCode::Enter => {
-								let idx = self.tab_state.table.selected().unwrap_or_default();
-								if let Some(song) = self.provider.likes().get(idx) {
-									self.provider.play(song.clone());
-								}
-							},
-							_ => {},
+						Event::Key(key_event) => {
+							let modifier = if key_event.modifiers.contains(KeyModifiers::SHIFT) { 5 } else { 1 };
+							match key_event.code {
+								KeyCode::Char('q') => return Ok(()),
+								KeyCode::Char('1') => { self.tab = 0; },
+								KeyCode::Char('2') => { self.tab = 1; },
+								KeyCode::Char('3') => { self.tab = 2; },
+								KeyCode::Char('4') => { self.tab = 3; },
+								KeyCode::Char('5') => { self.tab = 4; },
+								KeyCode::Char(' ') => { self.provider.toggle(); },
+								KeyCode::Char('n') => { self.provider.random_song()?; },
+								KeyCode::PageUp => { self.scroll = self.scroll.saturating_add(1); },
+								KeyCode::PageDown => { self.scroll = self.scroll.saturating_sub(1); },
+								KeyCode::Up => { self.tab_state.table.select(Some(self.tab_state.table.selected().unwrap_or_default().saturating_sub(modifier))); },
+								KeyCode::Down => { self.tab_state.table.select(Some(self.tab_state.table.selected().unwrap_or_default().saturating_add(modifier))); },
+								KeyCode::Tab => { self.tab = (self.tab + 1) % 5; }
+								KeyCode::Enter => {
+									let idx = self.tab_state.table.selected().unwrap_or_default();
+									if let Some(song) = self.provider.likes().get(idx) {
+										self.provider.play(song.clone());
+									}
+								},
+								_ => {},
+							}
 						},
 					},
 				},

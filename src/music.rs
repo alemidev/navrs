@@ -8,7 +8,9 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn likes(&self) -> Vec<sunk::song::Song>;
 	fn progress(&self) -> f32;
 	fn working(&self) -> bool;
+	fn running(&self) -> bool;
 	fn play(&self, song: sunk::song::Song);
+	fn toggle(&self);
 }
 
 #[derive(Clone)]
@@ -20,6 +22,7 @@ struct SubsonicProviderInner {
 	likes: std::sync::RwLock<SyncLikes>,
 	tx: std::sync::mpsc::Sender<Op>,
 	working: Arc<std::sync::atomic::AtomicBool>,
+	running: Arc<std::sync::atomic::AtomicBool>,
 }
 
 struct SyncLikes {
@@ -43,8 +46,11 @@ impl SubsonicProvider {
 		let likes = std::sync::RwLock::new(SyncLikes { songs: vec![], updated: std::time::SystemTime::UNIX_EPOCH });
 		let (tx, rx) = std::sync::mpsc::channel();
 		let working = Arc::new(std::sync::atomic::AtomicBool::new(false));
+		let running = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-		let inner = Arc::new(SubsonicProviderInner { client, buffer, song, likes, tx, working: working.clone() });
+		let inner = Arc::new(SubsonicProviderInner {
+			client, buffer, song, likes, tx, running, working: working.clone()
+		});
 		let ctx = inner.clone();
 
 		std::thread::spawn(move || work(ctx, rx, working));
@@ -65,6 +71,10 @@ impl SubsonicProvider {
 
 impl MusicProvider<f32> for SubsonicProvider {
 	fn data(&self, len: usize) -> Option<Vec<f32>> {
+		if !self.0.running.load(std::sync::atomic::Ordering::Relaxed) {
+			return None;
+		}
+
 		let mut buffer = self.0.buffer.lock().unwrap();
 
 		if len > buffer.buf.len() {
@@ -108,6 +118,15 @@ impl MusicProvider<f32> for SubsonicProvider {
 	fn working(&self) -> bool {
 		self.0.working.load(std::sync::atomic::Ordering::Relaxed)
 	}
+
+	fn running(&self) -> bool {
+		self.0.running.load(std::sync::atomic::Ordering::Relaxed)
+	}
+
+	fn toggle(&self) {
+		let prev = self.0.running.load(std::sync::atomic::Ordering::Relaxed);
+		self.0.running.store(!prev, std::sync::atomic::Ordering::Relaxed);
+	}
 }
 
 enum Op {
@@ -122,13 +141,16 @@ fn work(ctx: Arc<SubsonicProviderInner>, rx: std::sync::mpsc::Receiver<Op>, work
 		match op {
 			Op::PlaySong(mut song) => {
 
-				song.set_max_bit_rate(256); // TODO make configurable
+				song.set_max_bit_rate(320); // TODO make configurable
 				song.set_transcoding("mp3");
 	
 				let mut temp = Vec::new();
 				if match song.stream(&ctx.client) {
 					Ok(mut reader) => match reader.read_to_end(&mut temp) {
-						Ok(_) => true,
+						Ok(n) => {
+							log::info!("streamed {n} bytes");
+							true
+						},
 						Err(e) => {
 							log::error!("error copying streamed data: {e}");
 							false
@@ -151,9 +173,12 @@ fn work(ctx: Arc<SubsonicProviderInner>, rx: std::sync::mpsc::Receiver<Op>, work
 									out.push(*sample);
 								}
 							},
-							rmp3::Frame::Other(_) => {},
+							rmp3::Frame::Other(_data) => log::warn!("skipping other data in mp3"),
 						}
 					}
+					log::info!("parsed {} bytes", out.len());
+
+					ctx.running.store(true, std::sync::atomic::Ordering::Relaxed);
 
 					let mut buffer = ctx.buffer.lock().unwrap();
 					buffer.offset = 0;

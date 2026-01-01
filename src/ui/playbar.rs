@@ -9,7 +9,11 @@ impl Widget for Playbar<SubsonicProvider> {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
 		where Self: Sized
 	{
-		let block = Block::bordered().title("playing").red();
+		let running = self.0.running();
+		let block = Block::bordered()
+			.title(if running { " |> playing " } else { " || paused " })
+			.title_alignment(ratatui::layout::HorizontalAlignment::Center)
+			.red();
 		let inner_playbar = block.inner(area);
 		block.render(area, buf);
 

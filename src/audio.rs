@@ -33,7 +33,7 @@ impl AudioSink {
 					None => data.copy_from_slice(&vec![0f32; data.len()]),
 				}
 			},
-			|e| eprintln!("error sending data to sink: {e}"), // TODO reset?
+			|e| log::error!("error sending data to sink: {e}"), // TODO reset?
 			None,
 		)?;
 

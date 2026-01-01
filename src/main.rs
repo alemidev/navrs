@@ -1,10 +1,13 @@
 mod audio;
 mod music;
+mod app;
+mod logger;
+mod ui;
 
 
 use clap::Parser;
 
-use crate::{audio::AudioController, music::MusicProvider};
+use crate::audio::AudioController;
 
 /// A TUI Subsonic music player
 #[derive(Parser)]
@@ -23,19 +26,16 @@ struct Cli {
 }
 
 fn main() {
-	env_logger::init();
+	logger::init().unwrap();
 	let cli = Cli::parse();
 
-	let mut provider = music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
+	let provider = music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
 	let mut sink = audio::AudioSink::init(provider.clone()).unwrap();
 	sink.play();
 
-	loop {
-		if let Some(s) = provider.random_song().unwrap() {
-			println!(">> {s}");
-		} else {
-			println!("no song?");
-		}
-		provider.wait();
-	}
+	let term = ratatui::init();
+	let res = app::App::new(provider, sink).run(term);
+	ratatui::restore();
+
+	res.unwrap();
 }

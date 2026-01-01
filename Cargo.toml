@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 cpal = "0.17"
-env_logger = "0.11"
 log = "0.4"
+ratatui = "0.30.0"
 rmp3 = { version = "0.3", features = ["float"] }
 sunk = { git = "https://github.com/xeals/sunk", rev = "d07639b5f07aeaba015ef68d343848038230687b" }
 thiserror = "2.0"

@@ -1,5 +1,8 @@
-use ratatui::{layout::Constraint, style::{Style, Stylize}, widgets::{Block, Padding, Row, ScrollbarState, StatefulWidget, Table, TableState}};
-
+use ratatui::{
+	layout::Constraint,
+	style::{Style, Stylize},
+	widgets::{Block, Padding, Row, ScrollbarState, StatefulWidget, Table, TableState},
+};
 
 pub struct LikesTab(pub Vec<sunk::song::Song>);
 
@@ -12,8 +15,13 @@ pub struct LikesTabState {
 impl StatefulWidget for LikesTab {
 	type State = LikesTabState;
 
-	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State)
-		where Self: Sized
+	fn render(
+		self,
+		area: ratatui::prelude::Rect,
+		buf: &mut ratatui::prelude::Buffer,
+		state: &mut Self::State,
+	) where
+		Self: Sized,
 	{
 		let block = Block::bordered()
 			.padding(Padding::uniform(2))
@@ -22,11 +30,20 @@ impl StatefulWidget for LikesTab {
 			.dark_gray();
 
 		let rows = self.0.into_iter().map(song_into_row).collect::<Vec<Row>>();
-		let widths = [Constraint::Min(30), Constraint::Min(15), Constraint::Min(15)];
+		let widths = [
+			Constraint::Min(30),
+			Constraint::Min(15),
+			Constraint::Min(15),
+		];
 
 		Table::new(rows, widths)
 			.block(block)
-			.header(Row::new(["TITLE", "ARTIST", "ALBUM"]).white().on_black().bold())
+			.header(
+				Row::new(["TITLE", "ARTIST", "ALBUM"])
+					.white()
+					.on_black()
+					.bold(),
+			)
 			.row_highlight_style(Style::new().black().on_red().bold())
 			.render(area, buf, &mut state.table);
 	}
@@ -37,5 +54,6 @@ fn song_into_row<'a>(song: sunk::song::Song) -> Row<'a> {
 		song.title.clone(),
 		song.artist.clone().unwrap_or_default(),
 		song.album.clone().unwrap_or_default(),
-	]).white()
+	])
+	.white()
 }

@@ -1,15 +1,31 @@
-use ratatui::{layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}};
-
+use ratatui::{
+	layout::{Constraint, Layout},
+	style::Stylize,
+	text::Line,
+	widgets::{Block, Padding, Paragraph, Widget, Wrap},
+};
 
 pub struct PlayingTab(pub Option<sunk::song::Song>);
 
 impl Widget for PlayingTab {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-		where Self: Sized
+	where
+		Self: Sized,
 	{
-		let [_, pad, _] = Layout::vertical([Constraint::Percentage(20), Constraint::Percentage(60), Constraint::Percentage(20)]).areas(area);
-		let [main, queue] = Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]).areas(pad);
-		let [_, content, _] = Layout::horizontal([Constraint::Percentage(20), Constraint::Percentage(60), Constraint::Percentage(20)]).areas(main);
+		let [_, pad, _] = Layout::vertical([
+			Constraint::Percentage(20),
+			Constraint::Percentage(60),
+			Constraint::Percentage(20),
+		])
+		.areas(area);
+		let [main, queue] =
+			Layout::horizontal([Constraint::Percentage(70), Constraint::Percentage(30)]).areas(pad);
+		let [_, content, _] = Layout::horizontal([
+			Constraint::Percentage(20),
+			Constraint::Percentage(60),
+			Constraint::Percentage(20),
+		])
+		.areas(main);
 
 		let up_next = vec![
 			Line::from("next song"),
@@ -32,7 +48,14 @@ impl Widget for PlayingTab {
 				Line::from(song.artist.as_deref().unwrap_or("?").to_string().white()),
 				Line::from(song.album.as_deref().unwrap_or("?").to_string().gray()),
 				Line::from(""),
-				Line::from(format!("#{} - {}", song.track.unwrap_or_default(), song.year.unwrap_or_default()).gray()),
+				Line::from(
+					format!(
+						"#{} - {}",
+						song.track.unwrap_or_default(),
+						song.year.unwrap_or_default()
+					)
+					.gray(),
+				),
 				Line::from(song.content_type.clone().dark_gray()),
 			]
 		} else {
@@ -44,6 +67,5 @@ impl Widget for PlayingTab {
 			.centered()
 			.wrap(Wrap { trim: true })
 			.render(content, buf);
-
 	}
 }

@@ -1,9 +1,8 @@
-mod audio;
-mod music;
 mod app;
+mod audio;
 mod logger;
+mod music;
 mod ui;
-
 
 use clap::Parser;
 
@@ -27,7 +26,8 @@ fn main() {
 	logger::init().unwrap();
 	let cli = Cli::parse();
 
-	let provider = music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
+	let provider =
+		music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
 	let _sink = audio::AudioSink::init(provider.clone()).unwrap();
 
 	let term = ratatui::init();

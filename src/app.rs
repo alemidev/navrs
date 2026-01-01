@@ -1,16 +1,23 @@
-use ratatui::{DefaultTerminal, Frame, crossterm::event::{self, Event, KeyCode, KeyModifiers}, layout::{Constraint, Layout}, style::{Style, Stylize}, widgets::{Block, Paragraph, Tabs}};
+use ratatui::{
+	DefaultTerminal, Frame,
+	crossterm::event::{self, Event, KeyCode, KeyModifiers},
+	layout::{Constraint, Layout},
+	style::{Style, Stylize},
+	widgets::{Block, Paragraph, Tabs},
+};
 
-use crate::{music::{MusicProvider, SubsonicProvider}, ui::likes::LikesTabState};
+use crate::{
+	music::{MusicProvider, SubsonicProvider},
+	ui::likes::LikesTabState,
+};
 
-const SUBTUI : &str = r#"    _   /__/_   .
+const SUBTUI: &str = r#"    _   /__/_   .
   _\/_//_// /_// "#;
 
-const SUBTUI_WORKING_A : &str = r#"    _   /__/_   .        ___   ___   ___   ___   ___   |
+const SUBTUI_WORKING_A: &str = r#"    _   /__/_   .        ___   ___   ___   ___   ___   |
   _\/_//_// /_//    |                                 "#;
-const SUBTUI_WORKING_B : &str = r#"    _   /__/_   .   |___   ___   ___   ___   ___   ___
+const SUBTUI_WORKING_B: &str = r#"    _   /__/_   .   |___   ___   ___   ___   ___   ___
   _\/_//_// /_//                                      |"#;
-
-
 
 pub struct App {
 	pub provider: SubsonicProvider,
@@ -23,7 +30,13 @@ pub struct App {
 
 impl App {
 	pub fn new(provider: SubsonicProvider) -> Self {
-		Self { provider, scroll: 0, tab: 0, tab_state: LikesTabState::default(), flip_flop: false }
+		Self {
+			provider,
+			scroll: 0,
+			tab: 0,
+			tab_state: LikesTabState::default(),
+			flip_flop: false,
+		}
 	}
 
 	pub fn run(mut self, mut term: DefaultTerminal) -> sunk::Result<()> {
@@ -34,40 +47,80 @@ impl App {
 
 			match event::poll(std::time::Duration::from_millis(200)) {
 				Err(e) => log::error!("err polling event: {e}"),
-				Ok(false) => {},
+				Ok(false) => {}
 				Ok(true) => match event::read() {
 					Err(e) => log::error!("err reading event: {e}"),
 					Ok(ev) => match ev {
 						Event::FocusGained => {}
-						Event::FocusLost => {},
-						Event::Paste(_) => {},
-						Event::Resize(_, _) => {},
-						Event::Mouse(_mouse_event) => {},
+						Event::FocusLost => {}
+						Event::Paste(_) => {}
+						Event::Resize(_, _) => {}
+						Event::Mouse(_mouse_event) => {}
 						Event::Key(key_event) => {
-							let modifier = if key_event.modifiers.contains(KeyModifiers::SHIFT) { 5 } else { 1 };
+							let modifier = if key_event.modifiers.contains(KeyModifiers::SHIFT) {
+								5
+							} else {
+								1
+							};
 							match key_event.code {
 								KeyCode::Char('q') => return Ok(()),
-								KeyCode::Char('1') => { self.tab = 0; },
-								KeyCode::Char('2') => { self.tab = 1; },
-								KeyCode::Char('3') => { self.tab = 2; },
-								KeyCode::Char('4') => { self.tab = 3; },
-								KeyCode::Char('5') => { self.tab = 4; },
-								KeyCode::Char(' ') => { self.provider.toggle(); },
-								KeyCode::Char('n') => { self.provider.random_song()?; },
-								KeyCode::PageUp => { self.scroll = self.scroll.saturating_add(1); },
-								KeyCode::PageDown => { self.scroll = self.scroll.saturating_sub(1); },
-								KeyCode::Up => { self.tab_state.table.select(Some(self.tab_state.table.selected().unwrap_or_default().saturating_sub(modifier))); },
-								KeyCode::Down => { self.tab_state.table.select(Some(self.tab_state.table.selected().unwrap_or_default().saturating_add(modifier))); },
-								KeyCode::Tab => { self.tab = (self.tab + 1) % 5; }
+								KeyCode::Char('1') => {
+									self.tab = 0;
+								}
+								KeyCode::Char('2') => {
+									self.tab = 1;
+								}
+								KeyCode::Char('3') => {
+									self.tab = 2;
+								}
+								KeyCode::Char('4') => {
+									self.tab = 3;
+								}
+								KeyCode::Char('5') => {
+									self.tab = 4;
+								}
+								KeyCode::Char(' ') => {
+									self.provider.toggle();
+								}
+								KeyCode::Char('n') => {
+									self.provider.random_song()?;
+								}
+								KeyCode::PageUp => {
+									self.scroll = self.scroll.saturating_add(1);
+								}
+								KeyCode::PageDown => {
+									self.scroll = self.scroll.saturating_sub(1);
+								}
+								KeyCode::Up => {
+									self.tab_state.table.select(Some(
+										self.tab_state
+											.table
+											.selected()
+											.unwrap_or_default()
+											.saturating_sub(modifier),
+									));
+								}
+								KeyCode::Down => {
+									self.tab_state.table.select(Some(
+										self.tab_state
+											.table
+											.selected()
+											.unwrap_or_default()
+											.saturating_add(modifier),
+									));
+								}
+								KeyCode::Tab => {
+									self.tab = (self.tab + 1) % 5;
+								}
 								KeyCode::Enter => {
 									let idx = self.tab_state.table.selected().unwrap_or_default();
 									if let Some(song) = self.provider.likes().get(idx) {
 										self.provider.play(song.clone());
 									}
-								},
-								_ => {},
+								}
+								_ => {}
 							}
-						},
+						}
 					},
 				},
 			}
@@ -77,7 +130,11 @@ impl App {
 	fn draw(&mut self, frame: &mut Frame) {
 		let area = frame.area();
 
-		let vertical = Layout::vertical([Constraint::Length(3), Constraint::Min(0), Constraint::Length(4)]);
+		let vertical = Layout::vertical([
+			Constraint::Length(3),
+			Constraint::Min(0),
+			Constraint::Length(4),
+		]);
 		let [tabs, content, playbar] = vertical.areas(area);
 
 		let tab_layout = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(52)]);
@@ -94,15 +151,27 @@ impl App {
 		frame.render_widget(t, tabbar);
 
 		let subtui = if self.provider.working() {
-			Paragraph::new(if self.flip_flop { SUBTUI_WORKING_A } else { SUBTUI_WORKING_B }).dark_gray()
+			Paragraph::new(if self.flip_flop {
+				SUBTUI_WORKING_A
+			} else {
+				SUBTUI_WORKING_B
+			})
+			.dark_gray()
 		} else {
 			Paragraph::new(SUBTUI).bold().red()
 		};
 		frame.render_widget(subtui, title);
 
 		match self.tab {
-			0 => frame.render_widget(crate::ui::playing::PlayingTab(self.provider.song()), content),
-			1 => frame.render_stateful_widget(crate::ui::likes::LikesTab(self.provider.likes()), content, &mut self.tab_state),
+			0 => frame.render_widget(
+				crate::ui::playing::PlayingTab(self.provider.song()),
+				content,
+			),
+			1 => frame.render_stateful_widget(
+				crate::ui::likes::LikesTab(self.provider.likes()),
+				content,
+				&mut self.tab_state,
+			),
 			2 => frame.render_widget(crate::ui::library::LibraryTab, content),
 			3 => frame.render_widget(crate::ui::queue::QueueTab, content),
 			4 => frame.render_widget(crate::ui::logs::LogsTab(self.scroll), content),
@@ -111,6 +180,5 @@ impl App {
 
 		let widget = crate::ui::playbar::Playbar(self.provider.clone());
 		frame.render_widget(widget, playbar);
-
 	}
 }

@@ -245,15 +245,18 @@ fn cache() -> &'static DashMap<sunk::id::Id, Vec<f32>> {
 	CACHE.get_or_init(DashMap::default)
 }
 
-fn preload(song: &sunk::song::Song, client: &sunk::Client) -> bool {
+fn preload(song: &mut sunk::song::Song, client: &sunk::Client) -> bool {
 	if !cache().contains_key(&song.id) {
 		log::info!("preloading {song}");
 		let mut temp = Vec::new();
+		song.set_max_bit_rate(320); // TODO make configurable
+		song.set_transcoding("mp3");
 		match song.stream(client) {
 			Err(e) => { log::error!("error requesting song stream: {e}"); false },
 			Ok(mut reader) => match reader.read_to_end(&mut temp) {
 				Err(e) => { log::error!("error copying streamed data: {e}"); false },
 				Ok(_n) => {
+					// TODO this is small and convenient but buggy: switch to symphonia?
 					let mut decoder = rmp3::Decoder::new(&temp);
 					let mut out = Vec::new();
 					while let Some(frame) = decoder.next() {
@@ -286,14 +289,11 @@ fn work(
 	while let Ok(op) = rx.recv() {
 		working.store(true, std::sync::atomic::Ordering::Relaxed);
 		match op {
-			Op::Preload(song) => {
-				preload(&song, &ctx.client);
+			Op::Preload(mut song) => {
+				preload(&mut song, &ctx.client);
 			},
 			Op::PlaySong(mut song) => {
-				song.set_max_bit_rate(320); // TODO make configurable
-				song.set_transcoding("mp3");
-
-				preload(&song, &ctx.client);
+				preload(&mut song, &ctx.client);
 
 				if let Some(data) = cache().get(&song.id) {
 					*ctx.song.write().unwrap() = Some(song.clone());

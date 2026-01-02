@@ -207,7 +207,8 @@ impl MusicProvider<f32> for SubsonicProvider {
 	}
 
 	fn play_next(&self, song: sunk::song::Song) {
-		self.0.queue.write().unwrap().push_front(song);
+		self.0.queue.write().unwrap().push_front(song.clone());
+		self.0.tx.send(Op::Preload(song));
 	}
 
 	fn clear_queue(&self) {

@@ -3,7 +3,7 @@ use ratatui::{
 	crossterm::event::{self, Event, KeyCode, KeyModifiers},
 	layout::{Constraint, Layout},
 	style::{Style, Stylize},
-	widgets::{Block, Paragraph, Tabs},
+	widgets::{Block, ListState, Paragraph, Tabs},
 };
 
 use crate::{
@@ -20,6 +20,7 @@ pub struct App {
 	pub tab: usize,
 
 	tab_state: LikesTabState,
+	list: ListState,
 	flip_flop: bool,
 }
 
@@ -30,6 +31,7 @@ impl App {
 			scroll: 0,
 			tab: 0,
 			tab_state: LikesTabState::default(),
+			list: ListState::default(),
 			flip_flop: false,
 		}
 	}
@@ -93,22 +95,38 @@ impl App {
 								KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
 								KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
 								KeyCode::Up => {
-									self.tab_state.table.select(Some(
-										self.tab_state
-											.table
-											.selected()
-											.unwrap_or_default()
-											.saturating_sub(modifier),
-									));
+									match self.tab {
+										1 => {
+											self.tab_state.table.select(Some(
+												self.tab_state
+													.table
+													.selected()
+													.unwrap_or_default()
+													.saturating_sub(modifier),
+											));
+										},
+										3 => {
+											self.list.select_previous();
+										},
+										_ => {},
+									}
 								}
 								KeyCode::Down => {
-									self.tab_state.table.select(Some(
-										self.tab_state
-											.table
-											.selected()
-											.unwrap_or_default()
-											.saturating_add(modifier),
-									));
+									match self.tab {
+										1 => {
+											self.tab_state.table.select(Some(
+												self.tab_state
+													.table
+													.selected()
+													.unwrap_or_default()
+													.saturating_add(modifier),
+											));
+										},
+										3 => {
+											self.list.select_next();
+										},
+										_ => {},
+									}
 								}
 								KeyCode::Tab => {
 									self.tab = (self.tab + 1) % 5;
@@ -140,7 +158,12 @@ impl App {
 										},
 										_ => {},
 									}
-								}
+								},
+								KeyCode::Backspace => {
+									if self.tab == 3 && let Some(idx) = self.list.selected() {
+										self.provider.pop_queue(idx);
+									}
+								},
 								_ => {}
 							}
 						}
@@ -196,7 +219,7 @@ impl App {
 				&mut self.tab_state,
 			),
 			2 => frame.render_widget(crate::ui::library::LibraryTab, content),
-			3 => frame.render_widget(crate::ui::queue::QueueTab(self.provider.queue()), content),
+			3 => frame.render_stateful_widget(crate::ui::queue::QueueTab(self.provider.queue()), content, &mut self.list),
 			4 => frame.render_widget(crate::ui::logs::LogsTab(self.scroll), content),
 			_ => frame.render_widget(Block::bordered().title("wrong tab index").red(), content),
 		}

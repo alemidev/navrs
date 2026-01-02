@@ -14,8 +14,8 @@ impl super::Tab for LogsTab {
 		if let Event::Key(ev) = event {
 			let modifier = modifier_magnitude(ev) as u16;
 			match ev.code {
-				KeyCode::Up => self.scroll -= modifier,
-				KeyCode::Down => self.scroll += modifier,
+				KeyCode::Up => self.scroll = self.scroll.saturating_sub(modifier),
+				KeyCode::Down => self.scroll = self.scroll.saturating_add(modifier),
 				_ => {},
 			}
 		}

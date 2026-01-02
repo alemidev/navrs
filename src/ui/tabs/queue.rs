@@ -57,10 +57,18 @@ impl StatefulWidget for QueueTabWidget {
 	where
 		Self: Sized,
 	{
-		let up_next= self.0.into_iter().map(|s| {
-			let txt = format!("{} - {} ({})", s.title, s.artist.as_deref().unwrap_or_default(), s.album.as_deref().unwrap_or_default());
-			Line::from(txt.italic())
-		}).collect::<Vec<Line>>();
+		let up_next= self.0
+			.into_iter()
+			.enumerate()
+			.map(|(i, s)| {
+				let txt = format!("{} - {} ({})", s.title, s.artist.as_deref().unwrap_or_default(), s.album.as_deref().unwrap_or_default());
+				if i == 0 {
+					Line::from(txt.bold().white())
+				} else {
+					Line::from(txt.italic().gray())
+				}
+			})
+			.collect::<Vec<Line>>();
 
 		let block = Block::bordered()
 			.title("queue")

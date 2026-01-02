@@ -1,7 +1,6 @@
 use std::{collections::VecDeque, sync::{Arc, OnceLock}};
 
 use dashmap::DashMap;
-use libnotify::Urgency;
 use rand::seq::SliceRandom;
 use sunk::{Streamable, song::Song};
 
@@ -21,7 +20,8 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn next(&self) -> bool;
 
 	fn queue(&self) -> Vec<sunk::song::Song>;
-	fn enqueue(&self, song: Vec<sunk::song::Song>);
+	fn enqueue(&self, songs: Vec<sunk::song::Song>);
+	fn play_next(&self, song: sunk::song::Song);
 	fn clear_queue(&self);
 	fn seek(&self, percentage: f32);
 
@@ -203,6 +203,10 @@ impl MusicProvider<f32> for SubsonicProvider {
 		for s in songs {
 			q.push_back(s);
 		}
+	}
+
+	fn play_next(&self, song: sunk::song::Song) {
+		self.0.queue.write().unwrap().push_front(song);
 	}
 
 	fn clear_queue(&self) {

@@ -113,6 +113,14 @@ impl App {
 								KeyCode::Tab => {
 									self.tab = (self.tab + 1) % 5;
 								}
+								KeyCode::Char('=') => {
+									if self.tab == 1 {
+										let idx = self.tab_state.table.selected().unwrap_or_default();
+										if let Some(song) = self.provider.likes().get(idx) {
+											self.provider.play_next(song.clone());
+										}
+									}
+								},
 								KeyCode::Char('+') => {
 									if self.tab == 1 {
 										let idx = self.tab_state.table.selected().unwrap_or_default();

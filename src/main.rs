@@ -2,6 +2,7 @@ mod app;
 mod audio;
 mod logger;
 mod music;
+mod mpris;
 mod ui;
 
 use clap::Parser;
@@ -29,6 +30,19 @@ fn main() {
 	let provider =
 		music::SubsonicProvider::connect(&cli.host, &cli.username, &cli.password).unwrap();
 	let _sink = audio::AudioSink::init(provider.clone()).unwrap();
+
+	let p = provider.clone();
+	std::thread::spawn(|| tokio::runtime::Builder::new_current_thread()
+		.enable_all()
+		.build()
+		.expect("could not build tokio runtime")
+		.block_on(async move { 
+			match mpris::serve(p).await {
+				Ok(()) => std::future::pending().await,
+				Err(e) => log::error!("error serving over MPRIS: {e}"),
+			}
+		})
+	);
 
 	let term = ratatui::init();
 	let res = app::App::new(provider).run(term);

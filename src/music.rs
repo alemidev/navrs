@@ -15,7 +15,7 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn working(&self) -> bool;
 	fn running(&self) -> bool;
 
-	fn toggle(&self);
+	fn set_pause(&self, state: bool);
 	fn play(&self, song: sunk::song::Song);
 	fn next(&self) -> bool;
 
@@ -23,6 +23,18 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn enqueue(&self, song: Vec<sunk::song::Song>);
 	fn clear_queue(&self);
 	fn seek(&self, percentage: f32);
+
+	fn toggle(&self) {
+		self.set_pause(!self.running());
+	}
+
+	fn pause(&self) {
+		self.set_pause(true);
+	}
+
+	fn resume(&self) {
+		self.set_pause(false);
+	}
 
 	fn restart(&self) {
 		self.seek(0.);
@@ -179,11 +191,10 @@ impl MusicProvider<f32> for SubsonicProvider {
 		self.0.running.load(std::sync::atomic::Ordering::Relaxed)
 	}
 
-	fn toggle(&self) {
-		let prev = self.0.running.load(std::sync::atomic::Ordering::Relaxed);
+	fn set_pause(&self, state: bool) {
 		self.0
 			.running
-			.store(!prev, std::sync::atomic::Ordering::Relaxed);
+			.store(state, std::sync::atomic::Ordering::Relaxed);
 	}
 
 	fn enqueue(&self, songs: Vec<sunk::song::Song>) {

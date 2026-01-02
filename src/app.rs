@@ -1,38 +1,57 @@
 use ratatui::{
 	DefaultTerminal, Frame,
-	crossterm::event::{self, Event, KeyCode, KeyModifiers},
+	crossterm::event::{self, Event, KeyCode},
 	layout::{Constraint, Layout},
 	style::{Style, Stylize},
-	widgets::{Block, ListState, Paragraph, Tabs},
+	widgets::{Block, Paragraph, Tabs},
 };
 
 use crate::{
 	music::{MusicProvider, SubsonicProvider},
-	ui::likes::LikesTabState,
+	ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, queue::QueueTab},
 };
 
 const SUBTUI: &str = r#"    _   /__/_   .
   _\/_//_// /_// "#;
 
 pub struct App {
-	pub provider: SubsonicProvider,
-	pub scroll: u16,
-	pub tab: usize,
+	provider: SubsonicProvider,
 
-	tab_state: LikesTabState,
-	list: ListState,
+	tab: AppTabs,
+
+	playing_tab: PlayingTab,
+	likes_tab: LikesTab,
+	library_tab: LibraryTab,
+	queue_tab: QueueTab,
+	logs_tab: LogsTab,
+
+
 	flip_flop: bool,
 }
 
 impl App {
 	pub fn new(provider: SubsonicProvider) -> Self {
 		Self {
-			provider,
-			scroll: 0,
-			tab: 0,
-			tab_state: LikesTabState::default(),
-			list: ListState::default(),
+			playing_tab: PlayingTab::new(provider.clone()),
+			likes_tab: LikesTab::new(provider.clone()),
+			library_tab: LibraryTab::new(),
+			queue_tab: QueueTab::new(provider.clone()),
+			logs_tab: LogsTab::new(),
+
+			tab: AppTabs::Playing,
+
 			flip_flop: false,
+			provider,
+		}
+	}
+
+	pub fn tab(&mut self) -> &mut dyn Renderable {
+		match self.tab {
+			AppTabs::Playing => &mut self.playing_tab,
+			AppTabs::Likes => &mut self.likes_tab,
+			AppTabs::Library => &mut self.library_tab,
+			AppTabs::Queue => &mut self.queue_tab,
+			AppTabs::Logs => &mut self.logs_tab,
 		}
 	}
 
@@ -44,133 +63,53 @@ impl App {
 
 			let _frame = term.draw(|frame| self.draw(frame))?;
 
-			match event::poll(std::time::Duration::from_millis(200)) {
-				Err(e) => log::error!("err polling event: {e}"),
-				Ok(false) => {}
-				Ok(true) => match event::read() {
-					Err(e) => log::error!("err reading event: {e}"),
-					Ok(ev) => match ev {
+			if self.poll_events() {
+				break
+			}
+		}
+
+		Ok(())
+	}
+
+	fn poll_events(&mut self) -> bool {
+		match event::poll(std::time::Duration::from_millis(200)) {
+			Err(e) => log::error!("err polling event: {e}"),
+			Ok(false) => {}
+			Ok(true) => match event::read() {
+				Err(e) => log::error!("err reading event: {e}"),
+				Ok(ev) => {
+					self.tab().handle_input(&ev);
+					match ev {
 						Event::FocusGained => {}
 						Event::FocusLost => {}
 						Event::Paste(_) => {}
 						Event::Resize(_, _) => {}
 						Event::Mouse(_mouse_event) => {}
 						Event::Key(key_event) => {
-							let modifier = if key_event.modifiers.contains(KeyModifiers::SHIFT) {
-								5
-							} else {
-								1
-							};
+							let modifier = crate::ui::modifier_magnitude(&key_event);
 							match key_event.code {
-								KeyCode::Char('q') => return Ok(()),
-								KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
-								KeyCode::Char('1') => {
-									self.tab = 0;
-								}
-								KeyCode::Char('2') => {
-									self.tab = 1;
-								}
-								KeyCode::Char('3') => {
-									self.tab = 2;
-								}
-								KeyCode::Char('4') => {
-									self.tab = 3;
-								}
-								KeyCode::Char('5') => {
-									self.tab = 4;
-								}
+								KeyCode::Char('q') => return true,
+								KeyCode::Char('1') => self.tab = AppTabs::Playing,
+								KeyCode::Char('2') => self.tab = AppTabs::Likes,
+								KeyCode::Char('3') => self.tab = AppTabs::Library,
+								KeyCode::Char('4') => self.tab = AppTabs::Queue,
+								KeyCode::Char('5') => self.tab = AppTabs::Logs,
 								KeyCode::Char(' ') => {
 									self.provider.toggle();
 								}
-								KeyCode::Char('?') => {
-									self.provider.random_song()?;
-								}
+								KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
 								KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
-								KeyCode::PageUp => {
-									self.scroll = self.scroll.saturating_add(1);
-								}
-								KeyCode::PageDown => {
-									self.scroll = self.scroll.saturating_sub(1);
-								}
 								KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
 								KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
-								KeyCode::Up => {
-									match self.tab {
-										1 => {
-											self.tab_state.table.select(Some(
-												self.tab_state
-													.table
-													.selected()
-													.unwrap_or_default()
-													.saturating_sub(modifier),
-											));
-										},
-										3 => {
-											self.list.select_previous();
-										},
-										_ => {},
-									}
-								}
-								KeyCode::Down => {
-									match self.tab {
-										1 => {
-											self.tab_state.table.select(Some(
-												self.tab_state
-													.table
-													.selected()
-													.unwrap_or_default()
-													.saturating_add(modifier),
-											));
-										},
-										3 => {
-											self.list.select_next();
-										},
-										_ => {},
-									}
-								}
-								KeyCode::Tab => {
-									self.tab = (self.tab + 1) % 5;
-								}
-								KeyCode::Char('=') => {
-									if self.tab == 1 {
-										let idx = self.tab_state.table.selected().unwrap_or_default();
-										if let Some(song) = self.provider.likes().get(idx) {
-											self.provider.play_next(song.clone());
-										}
-									}
-								},
-								KeyCode::Char('+') => {
-									if self.tab == 1 {
-										let idx = self.tab_state.table.selected().unwrap_or_default();
-										if let Some(song) = self.provider.likes().get(idx) {
-											self.provider.enqueue(vec![song.clone()]);
-										}
-									}
-								},
-								KeyCode::Enter => {
-									match self.tab {
-										0 => self.provider.shuffle_liked(),
-										1 => {
-											let idx = self.tab_state.table.selected().unwrap_or_default();
-											if let Some(song) = self.provider.likes().get(idx) {
-												self.provider.play(song.clone());
-											}
-										},
-										_ => {},
-									}
-								},
-								KeyCode::Backspace => {
-									if self.tab == 3 && let Some(idx) = self.list.selected() {
-										self.provider.pop_queue(idx);
-									}
-								},
+								KeyCode::Tab => self.tab = self.tab.next(),
 								_ => {}
 							}
 						}
-					},
+					}
 				},
-			}
+			},
 		}
+		false
 	}
 
 	fn draw(&mut self, frame: &mut Frame) {
@@ -187,12 +126,12 @@ impl App {
 		let [title, tabbar] = tab_layout.areas(tabs);
 
 		let tabs_border = Block::bordered().gray();
-		let t = Tabs::new(["playing", "likes", "library", "queue", "log"])
+		let t = Tabs::new(AppTabs::titles())
 			.block(tabs_border)
 			.highlight_style(Style::new().red().bold())
 			.padding(" ", " ")
 			.divider(" | ")
-			.select(Some(self.tab))
+			.select(Some(self.tab.idx()))
 			.gray();
 		frame.render_widget(t, tabbar);
 
@@ -208,21 +147,7 @@ impl App {
 		};
 		frame.render_widget(subtui, title);
 
-		match self.tab {
-			0 => frame.render_widget(
-				crate::ui::playing::PlayingTab(self.provider.current_song(), self.provider.queue()),
-				content,
-			),
-			1 => frame.render_stateful_widget(
-				crate::ui::likes::LikesTab(self.provider.likes()),
-				content,
-				&mut self.tab_state,
-			),
-			2 => frame.render_widget(crate::ui::library::LibraryTab, content),
-			3 => frame.render_stateful_widget(crate::ui::queue::QueueTab(self.provider.queue()), content, &mut self.list),
-			4 => frame.render_widget(crate::ui::logs::LogsTab(self.scroll), content),
-			_ => frame.render_widget(Block::bordered().title("wrong tab index").red(), content),
-		}
+		self.tab().render(frame, content);
 
 		let widget = crate::ui::playbar::Playbar(self.provider.clone());
 		frame.render_widget(widget, playbar);

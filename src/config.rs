@@ -18,6 +18,9 @@ pub struct Config {
 pub struct ServerConfig {
 	#[serde_inline_default("http://localhost:8080/".to_string())]
 	pub base: String,
+
+	#[serde_inline_default(2)]
+	pub preload: usize,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]

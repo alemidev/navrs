@@ -1,13 +1,43 @@
 use ratatui::{
-	layout::{Constraint, Layout},
-	style::Stylize,
-	text::Line,
-	widgets::{Block, Padding, Paragraph, Widget, Wrap},
+	crossterm::event::{Event, KeyCode, KeyEvent}, layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}
 };
 
-pub struct PlayingTab(pub Option<sunk::song::Song>, pub Vec<sunk::song::Song>);
+use crate::music::{MusicProvider, SubsonicProvider};
 
-impl Widget for PlayingTab {
+pub struct PlayingTab {
+	provider: SubsonicProvider,
+}
+
+impl super::Tab for PlayingTab {
+	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) {
+		if let Event::Key(ev) = event {
+			match ev.code {
+				KeyCode::Enter => self.provider.shuffle_liked(),
+				KeyCode::Char('?') => { self.provider.random_song(); },
+				_ => {},
+			}
+		}
+	}
+}
+
+impl super::Renderable for PlayingTab {
+	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
+		frame.render_widget(PlayingTabWidget(self.provider.current_song(), self.provider.queue()), area);
+	}
+}
+
+impl PlayingTab {
+	pub fn new(provider: SubsonicProvider) -> Self {
+		Self { provider }
+	}
+}
+
+
+
+
+struct PlayingTabWidget(Option<sunk::song::Song>, Vec<sunk::song::Song>);
+
+impl Widget for PlayingTabWidget {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
 	where
 		Self: Sized,

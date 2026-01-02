@@ -22,7 +22,7 @@ pub trait MusicProvider<T>: Send + Clone {
 	fn queue(&self) -> Vec<sunk::song::Song>;
 	fn enqueue(&self, songs: Vec<sunk::song::Song>);
 	fn play_next(&self, song: sunk::song::Song);
-	fn pop_queue(&self, idx: usize);
+	fn pop_queue(&self, idx: usize) -> Option<sunk::song::Song>;
 	fn clear_queue(&self);
 	fn seek(&self, percentage: f32);
 
@@ -219,8 +219,8 @@ impl MusicProvider<f32> for SubsonicProvider {
 		self.0.queue.read().unwrap().iter().cloned().collect()
 	}
 
-	fn pop_queue(&self, idx: usize) {
-		self.0.queue.write().unwrap().remove(idx);
+	fn pop_queue(&self, idx: usize) -> Option<sunk::song::Song> {
+		self.0.queue.write().unwrap().remove(idx)
 	}
 
 	fn next(&self) -> bool {

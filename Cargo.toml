@@ -16,3 +16,8 @@ rmp3 = { version = "0.3", features = ["float"] }
 sunk = { git = "https://github.com/xeals/sunk", rev = "d07639b5f07aeaba015ef68d343848038230687b" }
 thiserror = "2.0"
 libnotify = "1.0.3"
+
+serde = { version = "1.0", features = ["derive"] }
+serde-inline-default = "1.0"
+serde_default = "0.2"
+toml = "0.9"

@@ -44,9 +44,11 @@ fn main() {
 		})
 	);
 
+	libnotify::init("subtui");
 	let term = ratatui::init();
 	let res = app::App::new(provider).run(term);
 	ratatui::restore();
+	libnotify::uninit();
 
 	res.unwrap();
 }

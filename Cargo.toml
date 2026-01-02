@@ -15,3 +15,4 @@ ratatui = "0.30"
 rmp3 = { version = "0.3", features = ["float"] }
 sunk = { git = "https://github.com/xeals/sunk", rev = "d07639b5f07aeaba015ef68d343848038230687b" }
 thiserror = "2.0"
+libnotify = "1.0.3"

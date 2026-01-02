@@ -1,6 +1,7 @@
 use std::{collections::VecDeque, sync::{Arc, OnceLock}};
 
 use dashmap::DashMap;
+use libnotify::Urgency;
 use rand::seq::SliceRandom;
 use sunk::{Streamable, song::Song};
 
@@ -292,6 +293,16 @@ fn work(
 
 				if let Some(data) = cache().get(&song.id) {
 					*ctx.song.write().unwrap() = Some(song.clone());
+
+					if let Err(e) = libnotify::Notification::new(
+						&song.title,
+						Some(format!("{} - {}", song.artist.as_deref().unwrap_or_default(), song.album.as_deref().unwrap_or_default()).as_str()),
+						Some("music"),
+					)
+						.show()
+					{
+						log::error!("error showing notification: {e}");
+					}
 
 					ctx.running
 						.store(true, std::sync::atomic::Ordering::Relaxed);

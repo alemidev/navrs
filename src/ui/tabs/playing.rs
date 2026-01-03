@@ -1,18 +1,33 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}
+	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, Padding, Paragraph, Wrap}
 };
 
 use crate::music::{MusicProvider, SubsonicProvider};
 
 pub struct PlayingTab {
 	provider: SubsonicProvider,
+	state: ListState,
 }
 
 impl super::Tab for PlayingTab {
 	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) {
 		if let Event::Key(ev) = event {
+			let modifier = crate::ui::modifier_magnitude(ev) as usize;
+			let idx = self.state.selected().unwrap_or_default();
 			match ev.code {
-				KeyCode::Enter => self.provider.shuffle_liked(),
+				KeyCode::Char('s') => self.provider.shuffle_liked(),
+				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
+				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
+				KeyCode::Backspace => { self.provider.pop_queue(idx); },
+				KeyCode::Esc => self.state.select(None),
+				KeyCode::Enter => {
+					if let Some(s) = self.provider.pop_queue(idx) {
+						self.provider.play_next(s);
+					}
+				},
+				// TODO move up and down in queue
+				// KeyCode::PageUp => {},
+				// KeyCode::PageDown => {},
 				_ => {},
 			}
 		}
@@ -21,13 +36,13 @@ impl super::Tab for PlayingTab {
 
 impl super::Renderable for PlayingTab {
 	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
-		frame.render_widget(PlayingTabWidget(self.provider.current_song(), self.provider.queue()), area);
+		frame.render_stateful_widget(PlayingTabWidget(self.provider.current_song(), self.provider.queue()), area, &mut self.state);
 	}
 }
 
 impl PlayingTab {
 	pub fn new(provider: SubsonicProvider) -> Self {
-		Self { provider }
+		Self { provider, state: ListState::default() }
 	}
 }
 
@@ -36,8 +51,10 @@ impl PlayingTab {
 
 struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>);
 
-impl Widget for PlayingTabWidget {
-	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
+	type State = ListState;
+
+	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State)
 	where
 		Self: Sized,
 	{
@@ -66,11 +83,13 @@ impl Widget for PlayingTabWidget {
 		}).collect::<Vec<Line>>();
 
 		let queue_box = Block::new().padding(Padding::uniform(content.height / 10));
-		Paragraph::new(up_next)
+		List::new(up_next)
 			.block(queue_box)
-			.right_aligned()
+			.scroll_padding(5)
+			.highlight_spacing(ratatui::widgets::HighlightSpacing::Never)
+			.highlight_style(Style::new().white().on_red())
 			.dark_gray()
-			.render(queue, buf);
+			.render(queue, buf, state);
 
 		let border = Block::bordered()
 			.padding(Padding::new(2, 2, content.height / 5, content.height / 5))
@@ -96,10 +115,13 @@ impl Widget for PlayingTabWidget {
 			vec![]
 		};
 
-		Paragraph::new(info)
-			.block(border)
-			.centered()
-			.wrap(Wrap { trim: true })
-			.render(content, buf);
+		{
+			use ratatui::widgets::Widget;
+			Paragraph::new(info)
+				.block(border)
+				.centered()
+				.wrap(Wrap { trim: true })
+				.render(content, buf);
+		}
 	}
 }

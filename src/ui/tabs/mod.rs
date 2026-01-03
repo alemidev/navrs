@@ -1,7 +1,7 @@
 pub mod playing;
 pub mod likes;
+pub mod search;
 pub mod library;
-pub mod queue;
 pub mod logs;
 
 pub use likes::LikesTab;
@@ -19,8 +19,8 @@ pub trait Renderable : Tab {
 pub enum AppTabs {
 	Playing,
 	Likes,
+	Search,
 	Library,
-	Queue,
 	Logs,
 }
 
@@ -29,8 +29,8 @@ impl AppTabs {
 		match self {
 			Self::Playing => Self::Likes,
 			Self::Likes => Self::Library,
-			Self::Library => Self::Queue,
-			Self::Queue => Self::Logs,
+			Self::Search => Self::Library,
+			Self::Library => Self::Logs,
 			Self::Logs => Self::Playing,
 		}
 	}
@@ -39,8 +39,8 @@ impl AppTabs {
 		match self {
 			Self::Playing => 0,
 			Self::Likes => 1,
-			Self::Library => 2,
-			Self::Queue => 3,
+			Self::Search => 2,
+			Self::Library => 3,
 			Self::Logs => 4,
 		}
 	}
@@ -49,8 +49,8 @@ impl AppTabs {
 		[
 			"playing",
 			"likes",
+			"search",
 			"library",
-			"queue",
 			"logs",
 		]
 	}

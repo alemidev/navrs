@@ -251,6 +251,7 @@ async fn preload(id: String, client: &submarine::Client) -> SubResult<Song> {
 	let song = match metadata_cache().get(&id) {
 		Some(s) => s.value().clone(),
 		None => {
+			log::info!("fetching song data: {id}");
 			client.get_song(&id).await?
 		},
 	};
@@ -261,7 +262,7 @@ async fn preload(id: String, client: &submarine::Client) -> SubResult<Song> {
 			log::info!("streaming {id}");
 			let data = client.stream(
 				&id,
-				Some(320),
+				None,
 				Some("subtui"),
 				None,
 				None::<String>,
@@ -358,6 +359,11 @@ impl SubsonicProviderActor {
 	
 		self.buffer.set(data).await;
 		log::info!("playing {song:?}");
+
+		if let Some(s) = self.queue.peek() {
+			if let Err(e) = preload(s.id.clone(), &self.client).await {
+				log::error!("error preloading {}: {e}", s.id);
+			}
+		}
 	}
 }
-

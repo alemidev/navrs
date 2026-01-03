@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
 	music::{MusicProvider, SubsonicProvider},
-	ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, queue::QueueTab},
+	ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab},
 };
 
 const SUBTUI: &str = r#"    _   /__/_   .
@@ -21,8 +21,8 @@ pub struct App {
 
 	playing_tab: PlayingTab,
 	likes_tab: LikesTab,
+	search_tab: SearchTab,
 	library_tab: LibraryTab,
-	queue_tab: QueueTab,
 	logs_tab: LogsTab,
 
 
@@ -34,8 +34,8 @@ impl App {
 		Self {
 			playing_tab: PlayingTab::new(provider.clone()),
 			likes_tab: LikesTab::new(provider.clone()),
+			search_tab: SearchTab::new(),
 			library_tab: LibraryTab::new(),
-			queue_tab: QueueTab::new(provider.clone()),
 			logs_tab: LogsTab::new(),
 
 			tab: AppTabs::Playing,
@@ -49,8 +49,8 @@ impl App {
 		match self.tab {
 			AppTabs::Playing => &mut self.playing_tab,
 			AppTabs::Likes => &mut self.likes_tab,
+			AppTabs::Search => &mut self.search_tab,
 			AppTabs::Library => &mut self.library_tab,
-			AppTabs::Queue => &mut self.queue_tab,
 			AppTabs::Logs => &mut self.logs_tab,
 		}
 	}
@@ -91,8 +91,8 @@ impl App {
 								KeyCode::Char('q') => return true,
 								KeyCode::Char('1') => self.tab = AppTabs::Playing,
 								KeyCode::Char('2') => self.tab = AppTabs::Likes,
-								KeyCode::Char('3') => self.tab = AppTabs::Library,
-								KeyCode::Char('4') => self.tab = AppTabs::Queue,
+								KeyCode::Char('3') => self.tab = AppTabs::Search,
+								KeyCode::Char('4') => self.tab = AppTabs::Library,
 								KeyCode::Char('5') => self.tab = AppTabs::Logs,
 								KeyCode::Char(' ') => {
 									self.provider.toggle();
@@ -122,7 +122,7 @@ impl App {
 		]);
 		let [tabs, content, playbar] = vertical.areas(area);
 
-		let tab_layout = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(52)]);
+		let tab_layout = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(53)]);
 		let [title, tabbar] = tab_layout.areas(tabs);
 
 		let tabs_border = Block::bordered().gray();

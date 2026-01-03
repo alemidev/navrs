@@ -181,7 +181,14 @@ impl Queue<sub::Song> for Provider {
 	fn next(&self) {
 		self.queue.advance();
 		if let Some(s) = self.queue.current() {
-				self.play(s.id);
+			self.play(s.id);
+			notify_rust::Notification::new()
+				.summary(&s.title)
+				.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
+				.urgency(notify_rust::Urgency::Low)
+				.appname("subtui")
+				.show()
+				.ignore();
 		} else {
 			// no upcoming songs, clear buffer and go to silence
 			self.sink.buffer.set(Vec::new());
@@ -192,6 +199,13 @@ impl Queue<sub::Song> for Provider {
 			self.queue.set_position(self.index() - 1);
 			if let Some(s) = self.queue.current() {
 				self.play(s.id);
+				notify_rust::Notification::new()
+					.summary(&s.title)
+					.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
+					.urgency(notify_rust::Urgency::Low)
+					.appname("subtui")
+					.show()
+					.ignore();
 			}
 		}
 	}

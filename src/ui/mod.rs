@@ -6,11 +6,11 @@ pub use app::App;
 
 pub fn modifier_magnitude(ev: &ratatui::crossterm::event::KeyEvent) -> f64 {
 	if ev.modifiers.contains(ratatui::crossterm::event::KeyModifiers::SHIFT) {
-		return 25.;
+		return 5.;
 	}
 
 	if ev.modifiers.contains(ratatui::crossterm::event::KeyModifiers::ALT) {
-		return 5.;
+		return 25.;
 	}
 
 	1.

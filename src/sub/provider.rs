@@ -203,7 +203,7 @@ impl Queue<sub::Song> for Provider {
 		self.queue.insert(self.queue.len(), x);
 	}
 	fn enqueue_next(&self, x: sub::Song) {
-		self.queue.insert(self.queue.position(), x);
+		self.queue.insert(self.queue.position() + 1, x);
 	}
 	fn enqueue_at(&self, index: usize, x: sub::Song) {
 		self.queue.insert(index, x);

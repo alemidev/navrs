@@ -183,7 +183,7 @@ impl<T: Clone> Queue<T> {
 		let idx = self.0.position.get();
 		// TODO load-bearing .insert() ...
 		self.0.setter.send_modify(|data| data.insert(pos, val));
-		if pos > idx {
+		if pos <= idx {
 			self.0.position.set(idx + 1);
 		}
 	}

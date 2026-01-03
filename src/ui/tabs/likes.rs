@@ -56,10 +56,13 @@ impl super::Tab for LikesTab {
 						self.provider.enqueue(vec![song.clone()]);
 					}
 				},
+				KeyCode::Char('r') => {
+					self.provider.refresh_likes();
+				},
 				KeyCode::Enter => {
 					let idx = self.table.selected().unwrap_or_default();
 					if let Some(song) = self.provider.likes().get(idx) {
-						self.provider.play(song.clone());
+						self.provider.play(song.id.clone());
 					}
 				},
 				_ => {},
@@ -77,7 +80,7 @@ impl super::Renderable for LikesTab {
 
 
 
-struct LikesTabWidget(Vec<sunk::song::Song>);
+struct LikesTabWidget(Vec<submarine::data::Child>);
 
 impl StatefulWidget for LikesTabWidget {
 	type State = TableState;
@@ -116,7 +119,7 @@ impl StatefulWidget for LikesTabWidget {
 	}
 }
 
-fn song_into_row<'a>(song: sunk::song::Song) -> Row<'a> {
+fn song_into_row<'a>(song: submarine::data::Child) -> Row<'a> {
 	Row::new([
 		song.title.clone(),
 		song.artist.clone().unwrap_or_default(),

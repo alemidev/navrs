@@ -1,10 +1,10 @@
-mod app;
 mod audio;
 mod logger;
 mod music;
 mod mpris;
 mod ui;
 mod config;
+mod ext;
 
 use std::str::FromStr;
 
@@ -27,9 +27,9 @@ fn main() {
 		Err(e) => return println!("invalid config: {e}"),
 	};
 
-	let provider =
-		music::SubsonicProvider::connect(&cfg.server.base, &cfg.auth.username, &cfg.auth.password)
-			.expect("could not connect to subsonic server");
+	// TODO ew but whatever i guess...
+	let (provider, fut) =
+		music::SubsonicProvider::create(cfg.server.base, cfg.auth.username, cfg.auth.password);
 	let _sink = audio::AudioSink::init(provider.clone()).unwrap();
 
 	let p = provider.clone();
@@ -37,7 +37,8 @@ fn main() {
 		.enable_all()
 		.build()
 		.expect("could not build tokio runtime")
-		.block_on(async move { 
+		.block_on(async move {
+			tokio::spawn(fut);
 			match mpris::serve(p).await {
 				Ok(()) => std::future::pending().await,
 				Err(e) => log::error!("error serving over MPRIS: {e}"),
@@ -45,9 +46,9 @@ fn main() {
 		})
 	);
 
-	libnotify::init("subtui");
+	libnotify::init("subtui").expect("could not initialize libnotify");
 	let term = ratatui::init();
-	let res = app::App::new(provider).run(term);
+	let res = ui::App::new(provider).run(term);
 	ratatui::restore();
 	libnotify::uninit();
 

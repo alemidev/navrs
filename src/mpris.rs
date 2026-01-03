@@ -1,5 +1,5 @@
 use mpris_server::{
-	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, Property, RootInterface, Server, Signal, Time, TrackId, Volume, zbus::{Result, fdo}
+	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, RootInterface, Server, Time, TrackId, Volume, zbus::{Result, fdo}
 };
 
 use crate::music::{MusicProvider, SubsonicProvider};
@@ -18,7 +18,7 @@ impl RootInterface for SubtuiPlayer {
 	async fn can_quit(&self) -> fdo::Result<bool> { Ok(false) }
 
 	async fn fullscreen(&self) -> fdo::Result<bool> { Ok(false) }
-	async fn set_fullscreen(&self,fullscreen:bool) -> Result<()> { Ok(()) }
+	async fn set_fullscreen(&self, _fullscreen:bool) -> Result<()> { Ok(()) }
 	async fn can_set_fullscreen(&self) -> fdo::Result<bool> { Ok(false) }
 
 	async fn has_track_list(&self) -> fdo::Result<bool> { Ok(false) } // TODO can do this!
@@ -72,16 +72,16 @@ impl PlayerInterface for SubtuiPlayer {
 		Ok(())
 	}
 
-	async fn seek(&self, offset: Time) -> fdo::Result<()> {
+	async fn seek(&self, _offset: Time) -> fdo::Result<()> {
 		// TODO doable but annoying
 		Ok(())
 	}
 
-	async fn set_position(&self, track_id: TrackId, position: Time) -> fdo::Result<()> {
+	async fn set_position(&self, _track_id: TrackId, _position: Time) -> fdo::Result<()> {
 		Ok(())
 	}
 
-	async fn open_uri(&self, uri: String) -> fdo::Result<()> {
+	async fn open_uri(&self, _uri: String) -> fdo::Result<()> {
 		Ok(())
 	}
 
@@ -97,7 +97,7 @@ impl PlayerInterface for SubtuiPlayer {
 		Ok(LoopStatus::None)
 	}
 
-	async fn set_loop_status(&self, loop_status: LoopStatus) -> Result<()> {
+	async fn set_loop_status(&self, _loop_status: LoopStatus) -> Result<()> {
 		Ok(())
 	}
 
@@ -105,7 +105,7 @@ impl PlayerInterface for SubtuiPlayer {
 		Ok(1.0)
 	}
 
-	async fn set_rate(&self, rate: PlaybackRate) -> Result<()> {
+	async fn set_rate(&self, _rate: PlaybackRate) -> Result<()> {
 		Ok(())
 	}
 
@@ -113,7 +113,7 @@ impl PlayerInterface for SubtuiPlayer {
 		Ok(false)
 	}
 
-	async fn set_shuffle(&self, shuffle: bool) -> Result<()> {
+	async fn set_shuffle(&self, _shuffle: bool) -> Result<()> {
 		Ok(())
 	}
 
@@ -161,7 +161,7 @@ impl PlayerInterface for SubtuiPlayer {
 
 pub async fn serve(provider: crate::music::SubsonicProvider) -> Result<()> {
 	log::info!("preparing MPRIS server");
-	let server = Server::new("dev.alemi.subtui", SubtuiPlayer(provider)).await?;
+	let _server = Server::new("dev.alemi.subtui", SubtuiPlayer(provider)).await?;
 	let _: () = std::future::pending().await;
 	Ok(())
 }

@@ -1,28 +1,37 @@
-use std::{collections::VecDeque, sync::{Arc, OnceLock}};
+use std::sync::{Arc, OnceLock};
 
 use dashmap::DashMap;
 use rand::seq::SliceRandom;
-use sunk::{Streamable, song::Song};
+use tokio::sync::{mpsc, watch};
+
+use crate::ext::{atomic, err::IgnorableError};
+
+pub type Song = submarine::data::Child;
+pub type Id = String;
+
+pub type SubResult<T> = Result<T, submarine::SubsonicError>;
 
 // TODO huge trait, more default or split it down!!
 pub trait MusicProvider<T>: Send + Clone {
 	fn data(&self, len: usize) -> Option<Vec<T>>; // TODO cloneless??
 
-	fn current_song(&self) -> Option<sunk::song::Song>;
-	fn likes(&self) -> Vec<sunk::song::Song>;
+	fn current_song(&self) -> Option<Song>;
+	fn likes(&self) -> Vec<Song>;
 
 	fn progress(&self) -> f32;
 	fn working(&self) -> bool;
 	fn running(&self) -> bool;
 
 	fn set_pause(&self, state: bool);
-	fn play(&self, song: sunk::song::Song);
-	fn next(&self) -> bool;
+	fn play(&self, song: Id);
+	fn next(&self);
 
-	fn queue(&self) -> Vec<sunk::song::Song>;
-	fn enqueue(&self, songs: Vec<sunk::song::Song>);
-	fn play_next(&self, song: sunk::song::Song);
-	fn pop_queue(&self, idx: usize) -> Option<sunk::song::Song>;
+	fn queue(&self) -> Vec<Song>;
+	fn enqueue(&self, songs: Vec<Song>);
+	fn play_next(&self, song: Song);
+
+	#[deprecated = "can't be really done without locking, need higher-level methods maybe"]
+	fn pop_queue(&self, idx: usize) -> Option<Song>;
 	fn clear_queue(&self);
 	fn seek(&self, percentage: f32);
 
@@ -57,282 +66,296 @@ pub trait MusicProvider<T>: Send + Clone {
 	}
 }
 
+
 #[derive(Clone)]
-pub struct SubsonicProvider(Arc<SubsonicProviderInner>);
-struct SubsonicProviderInner {
-	client: sunk::Client,
-	buffer: std::sync::Mutex<SyncBuffer>,
-	song: std::sync::RwLock<Option<Song>>,
-	likes: std::sync::RwLock<SyncLikes>,
-	tx: std::sync::mpsc::Sender<Op>,
-	working: Arc<std::sync::atomic::AtomicBool>,
-	running: Arc<std::sync::atomic::AtomicBool>,
-	queue: std::sync::RwLock<VecDeque<sunk::song::Song>>,
+pub struct SubsonicProvider(Arc<SubsonicProviderHandle>);
+struct SubsonicProviderHandle {
+	song: watch::Receiver<Option<Song>>,
+	likes: watch::Receiver<Vec<Song>>,
+	queue: atomic::Queue<Song>,
+	buffer: atomic::Buffer<f32>,
+	op: mpsc::UnboundedSender<Op>,
+	running: atomic::Flag,
+	working: atomic::Flag,
 }
 
-struct SyncLikes {
-	songs: Vec<Song>,
-	updated: std::time::SystemTime,
-}
-
-struct SyncBuffer {
-	buf: Vec<f32>,
-	offset: usize,
+struct SubsonicProviderActor {
+	client: submarine::Client,
+	song: watch::Sender<Option<Song>>,
+	likes: watch::Sender<Vec<Song>>,
+	queue: atomic::Queue<Song>,
+	buffer: atomic::Buffer<f32>,
+	op: mpsc::UnboundedReceiver<Op>,
+	running: atomic::Flag,
+	working: atomic::Flag,
 }
 
 impl SubsonicProvider {
-	pub fn connect(host: &str, username: &str, password: &str) -> Result<Self, sunk::Error> {
-		let client =
-			sunk::Client::new(host, username, password)?.with_target(sunk::Version::from("1.14.0"));
-		println!(
-			"connected: ver {} - target {}",
-			client.ver, client.target_ver
-		);
-		let buf = vec![0f32; 4096]; // TODO must be big enough
-		let offset = 0;
-		let buffer = std::sync::Mutex::new(SyncBuffer { buf, offset });
-		let song = std::sync::RwLock::new(None);
-		let queue = std::sync::RwLock::new(VecDeque::new());
-		let likes = std::sync::RwLock::new(SyncLikes {
-			songs: vec![],
-			updated: std::time::SystemTime::UNIX_EPOCH,
-		});
-		let (tx, rx) = std::sync::mpsc::channel();
-		let working = Arc::new(std::sync::atomic::AtomicBool::new(false));
-		let running = Arc::new(std::sync::atomic::AtomicBool::new(false));
+	pub fn create(host: String, username: String, password: String) -> (Self, impl std::future::Future<Output = impl Send> + Send) {
+		let auth = submarine::auth::AuthBuilder::new(username, "v1.16.1")
+			.client_name("subtui")
+			.hashed(&password);
+		let client = submarine::Client::new(&host, auth);
+		let buffer = atomic::Buffer::new(vec![0f32; 4096]); // TODO sizing?
+		let queue = atomic::Queue::new(vec![]);
+		let (song_tx, song_rx) = watch::channel(None);
+		let (likes_tx, likes_rx) = watch::channel(Vec::new());
+		let (op_tx, op_rx) = mpsc::unbounded_channel();
+		let running = atomic::Flag::new(false);
+		let working = atomic::Flag::new(false);
 
-		let inner = Arc::new(SubsonicProviderInner {
+		op_tx.send(Op::RefreshLikes).ignore();
+
+		let worker = SubsonicProviderActor {
 			client,
-			buffer,
-			song,
-			likes,
-			tx,
-			running,
+			song: song_tx,
+			likes: likes_tx,
+			queue: queue.clone(),
+			buffer: buffer.clone(),
+			op: op_rx,
+			running: running.clone(),
 			working: working.clone(),
-			queue,
-		});
-		let ctx = inner.clone();
+		};
 
-		std::thread::spawn(move || work(ctx, rx, working));
-
-		Ok(Self(inner))
+		(
+			Self(Arc::new(SubsonicProviderHandle {
+				song: song_rx,
+				likes: likes_rx,
+				buffer,
+				op: op_tx,
+				queue,
+				running,
+				working
+			})),
+			async move {
+				worker.work().await
+			}
+		)
 	}
 
-	pub fn random_song(&mut self) -> Result<Option<Song>, sunk::Error> {
-		let songs = Song::random(&self.0.client, 1)?.into_iter().next();
-		if let Some(song) = songs {
-			self.play(song.clone());
-			Ok(Some(song))
-		} else {
-			Ok(None)
-		}
+	// TODO MEHHHHHH
+	pub fn refresh_likes(&self) {
+		self.0.op.send(Op::RefreshLikes).ignore();
 	}
 }
 
 impl MusicProvider<f32> for SubsonicProvider {
 	fn data(&self, len: usize) -> Option<Vec<f32>> {
-		if !self.0.running.load(std::sync::atomic::Ordering::Relaxed) {
+		if !self.0.running.get() {
 			return None;
 		}
 
-		let mut buffer = self.0.buffer.lock().unwrap();
-
-		if len > buffer.buf.len() {
+		if len > self.0.buffer.len() {
 			return None;
 		}
 
 		// finished, load next?
-		if buffer.offset + len > buffer.buf.len() {
-			if self.0.running.load(std::sync::atomic::Ordering::Relaxed) {
+		if self.0.buffer.offset() + len > self.0.buffer.len() {
+			if self.0.running.get() {
 				self.next();
-				self.0.running.store(false, std::sync::atomic::Ordering::Relaxed);
+				self.0.running.toggle();
 			}
 			return None;
 		}
 
-		buffer.offset += len;
-		let data = buffer.buf[buffer.offset - len..buffer.offset].to_vec();
-
-		Some(data)
+		self.0.buffer.try_read(len)
 	}
 
-	fn current_song(&self) -> Option<sunk::song::Song> {
-		self.0.song.read().unwrap().clone()
+	fn current_song(&self) -> Option<Song> {
+		self.0.song.borrow().clone()
 	}
 
-	fn likes(&self) -> Vec<sunk::song::Song> {
-		if std::time::SystemTime::now()
-			> self.0.likes.read().unwrap().updated + std::time::Duration::from_secs(300)
-		{
-			self.0.tx.send(Op::RefreshLikes);
-		}
-
-		self.0.likes.read().unwrap().songs.clone()
+	fn likes(&self) -> Vec<Song> {
+		self.0.likes.borrow().clone()
 	}
 
 	fn progress(&self) -> f32 {
-		if self.0.song.read().unwrap().is_none() {
+		if self.0.song.borrow().is_none() {
 			return 0.;
 		}
-		let buf = self.0.buffer.lock().unwrap();
-		(buf.offset as f32 / buf.buf.len() as f32).clamp(0., 1.)
+		self.0.buffer.progress()
 	}
 
-	fn play(&self, song: sunk::song::Song) {
-		self.0.tx.send(Op::PlaySong(song));
-		if let Some(song) = self.0.queue.read().unwrap().get(0) {
-			self.0.tx.send(Op::Preload(song.clone()));
+	fn play(&self, song: Id) {
+		self.0.op.send(Op::PlaySong(song)).ignore();
+		if let Some(song) = self.0.queue.peek() {
+			self.0.op.send(Op::Preload(song.id)).ignore();
 		}
 	}
 
 	fn working(&self) -> bool {
-		self.0.working.load(std::sync::atomic::Ordering::Relaxed)
+		self.0.working.get()
 	}
 
 	fn running(&self) -> bool {
-		self.0.running.load(std::sync::atomic::Ordering::Relaxed)
+		self.0.running.get()
 	}
 
 	fn set_pause(&self, state: bool) {
-		self.0
-			.running
-			.store(state, std::sync::atomic::Ordering::Relaxed);
+		self.0.running.set(state);
 	}
 
-	fn enqueue(&self, songs: Vec<sunk::song::Song>) {
-		let mut q = self.0.queue.write().unwrap();
-		for s in songs {
-			q.push_back(s);
-		}
+	fn enqueue(&self, songs: Vec<Song>) {
+		self.0.op.send(Op::Enqueue(songs, false)).ignore();
 	}
 
-	fn play_next(&self, song: sunk::song::Song) {
-		self.0.queue.write().unwrap().push_front(song.clone());
-		self.0.tx.send(Op::Preload(song));
+	fn play_next(&self, song: Song) {
+		self.0.op.send(Op::Enqueue(vec![song], true)).ignore();
 	}
 
 	fn clear_queue(&self) {
-		self.0.queue.write().unwrap().clear();
+		self.0.op.send(Op::ClearQueue).ignore();
 	}
 
-	fn queue(&self) -> Vec<sunk::song::Song> {
-		// TODO lmao whats this can it be better?
-		self.0.queue.read().unwrap().iter().cloned().collect()
+	fn queue(&self) -> Vec<Song> {
+		self.0.queue.snapshot()
 	}
 
-	fn pop_queue(&self, idx: usize) -> Option<sunk::song::Song> {
-		self.0.queue.write().unwrap().remove(idx)
+	fn pop_queue(&self, idx: usize) -> Option<Song> {
+		let res = self.0.queue.snapshot().get(idx).cloned();
+		self.0.op.send(Op::Dequeue(idx)).ignore();
+		res
 	}
 
-	fn next(&self) -> bool {
-		let res = self.0.queue.write().unwrap().pop_front();
-		if let Some(song) = res {
-			self.play(song);
-			return true;
-		}
-		false
+	fn next(&self) {
+		self.0.op.send(Op::Next).ignore();
 	}
 
 	fn seek(&self, percentage: f32) {
-		let mut buffer = self.0.buffer.lock().unwrap();
-		let total = buffer.buf.len() as f32;
-		buffer.offset = (total * percentage) as usize;
+		self.0.op.send(Op::Seek(percentage)).ignore();
 	}
 }
 
 enum Op {
-	PlaySong(sunk::song::Song),
-	Preload(sunk::song::Song),
+	PlaySong(Id),
+	Preload(Id),
+	Enqueue(Vec<Song>, bool),
+	Dequeue(usize),
+	Seek(f32),
+	Next,
+	ClearQueue,
 	RefreshLikes,
 }
 
-fn cache() -> &'static DashMap<sunk::id::Id, Vec<f32>> {
-	static CACHE: OnceLock<DashMap<sunk::id::Id, Vec<f32>>> = OnceLock::new();
+fn data_cache() -> &'static DashMap<String, Vec<f32>> {
+	static CACHE: OnceLock<DashMap<String, Vec<f32>>> = OnceLock::new();
 	CACHE.get_or_init(DashMap::default)
 }
 
-fn preload(song: &mut sunk::song::Song, client: &sunk::Client) -> bool {
-	if !cache().contains_key(&song.id) {
-		log::info!("preloading {song}");
-		let mut temp = Vec::new();
-		song.set_max_bit_rate(320); // TODO make configurable
-		song.set_transcoding("mp3");
-		match song.stream(client) {
-			Err(e) => { log::error!("error requesting song stream: {e}"); false },
-			Ok(mut reader) => match reader.read_to_end(&mut temp) {
-				Err(e) => { log::error!("error copying streamed data: {e}"); false },
-				Ok(_n) => {
-					// TODO this is small and convenient but buggy: switch to symphonia?
-					let mut decoder = rmp3::Decoder::new(&temp);
-					let mut out = Vec::new();
-					while let Some(frame) = decoder.next() {
-						match frame {
-							rmp3::Frame::Audio(audio) => {
-								// TODO is there a push_all??
-								for sample in audio.samples() {
-									out.push(*sample);
-								}
-							}
-							rmp3::Frame::Other(_data) => {},
+fn metadata_cache() -> &'static DashMap<String, Song> {
+	static CACHE: OnceLock<DashMap<String, Song>> = OnceLock::new();
+	CACHE.get_or_init(DashMap::default)
+}
+
+async fn preload(id: String, client: &submarine::Client) -> SubResult<Song> {
+	let song = match metadata_cache().get(&id) {
+		Some(s) => s.value().clone(),
+		None => {
+			client.get_song(&id).await?
+		},
+	};
+
+	match data_cache().get(&id) {
+		Some(_) => Ok(song),
+		None => {
+			log::info!("streaming {id}");
+			let data = client.stream(
+				&id,
+				Some(320),
+				Some("subtui"),
+				None,
+				None::<String>,
+				None,
+				None
+			)
+				.await?;
+			let mut decoder = rmp3::Decoder::new(&data);
+			let mut out = Vec::new();
+			while let Some(frame) = decoder.next() {
+				match frame {
+					rmp3::Frame::Audio(audio) => {
+						// TODO is there a push_all??
+						for sample in audio.samples() {
+							out.push(*sample);
 						}
 					}
-
-					cache().insert(song.id.clone(), out);
-					true
-				},
-			},
-		}
-	} else {
-		true
-	}
-}
-
-fn work(
-	ctx: Arc<SubsonicProviderInner>,
-	rx: std::sync::mpsc::Receiver<Op>,
-	working: Arc<std::sync::atomic::AtomicBool>,
-) {
-	while let Ok(op) = rx.recv() {
-		working.store(true, std::sync::atomic::Ordering::Relaxed);
-		match op {
-			Op::Preload(mut song) => {
-				preload(&mut song, &ctx.client);
-			},
-			Op::PlaySong(mut song) => {
-				preload(&mut song, &ctx.client);
-
-				if let Some(data) = cache().get(&song.id) {
-					*ctx.song.write().unwrap() = Some(song.clone());
-
-					if let Err(e) = libnotify::Notification::new(
-						&song.title,
-						Some(format!("{} - {}", song.artist.as_deref().unwrap_or_default(), song.album.as_deref().unwrap_or_default()).as_str()),
-						Some("music"),
-					)
-						.show()
-					{
-						log::error!("error showing notification: {e}");
-					}
-
-					ctx.running
-						.store(true, std::sync::atomic::Ordering::Relaxed);
-
-					log::info!("playing {song}");
-					let mut buffer = ctx.buffer.lock().unwrap();
-					buffer.offset = 0;
-					buffer.buf = data.value().clone();
+					rmp3::Frame::Other(_data) => {},
 				}
 			}
-			Op::RefreshLikes => match ctx.client.starred(1) {
-				Ok(res) => {
-					let mut guard = ctx.likes.write().unwrap();
-					guard.songs = res.songs;
-					guard.updated = std::time::SystemTime::now();
-				}
-				Err(e) => log::error!("error fetching likes: {e}"),
-			},
-		}
-		working.store(false, std::sync::atomic::Ordering::Relaxed);
+
+			data_cache().insert(id, out.clone());
+			Ok(song)
+		},
 	}
-	log::warn!("closing worker loop");
 }
+
+impl SubsonicProviderActor {
+	async fn work(mut self) {
+		while let Some(op) = self.op.recv().await {
+			self.working.set(true);
+			match op {
+				Op::Preload(id) => {
+					if let Err(e) = preload(id.clone(), &self.client).await {
+						log::error!("error preloading song {id}: {e}");
+					}
+				},
+				Op::PlaySong(id) => {
+					match preload(id, &self.client).await {
+						Err(e) => log::error!("could not preload song for playing: {e}"),
+						Ok(song) => if let Some(data) = data_cache().get(&song.id) {
+							self.play(song, data.value().clone()).await;
+						},
+					}
+				}
+				Op::RefreshLikes => match self.client.get_starred(None::<String>).await {
+					Ok(res) => { self.likes.send(res.song).ignore(); },
+					Err(e) => log::error!("error fetching likes: {e}"),
+				},
+				Op::Enqueue(childs, front) => if front {
+					for s in childs {
+						self.queue.push_front(s).await;
+					}
+				} else {
+					for s in childs {
+						self.queue.push(s).await;
+					}
+				},
+				Op::Dequeue(idx) => { self.queue.remove(idx).await; },
+				Op::Seek(pos) => self.buffer.seek(pos).await,
+				Op::Next => if let Some(song) = self.queue.pop().await {
+					match preload(song.id, &self.client).await {
+						Err(e) => log::error!("could not preload next song for playing: {e}"),
+						Ok(song) => {
+							if let Some(data) = data_cache().get(&song.id) {
+								self.song.send(Some(song.clone())).ignore();
+								self.play(song, data.value().clone()).await;
+							}
+						},
+					}
+				},
+				Op::ClearQueue => self.queue.clear().await,
+			}
+			self.working.set(false);
+		}
+		log::warn!("closing worker loop");
+	}
+
+	async fn play(&self, song: Song, data: Vec<f32>) {
+		self.song.send(Some(song.clone())).ignore();
+		if let Err(e) = libnotify::Notification::new(
+			&song.title,
+			Some(format!("{} - {}", song.artist.as_deref().unwrap_or_default(), song.album.as_deref().unwrap_or_default()).as_str()),
+			Some("music"),
+		)
+			.show()
+		{
+			log::error!("error showing notification: {e}");
+		}
+
+		self.running.set(true);
+	
+		self.buffer.set(data).await;
+		log::info!("playing {song:?}");
+	}
+}
+

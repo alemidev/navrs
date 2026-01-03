@@ -13,7 +13,7 @@ pub enum AudioSinkError {
 }
 
 pub struct AudioSink {
-	stream: cpal::Stream,
+	_stream: cpal::Stream,
 }
 
 impl AudioSink {
@@ -36,6 +36,6 @@ impl AudioSink {
 
 		stream.play()?;
 
-		Ok(Self { stream })
+		Ok(Self { _stream: stream })
 	}
 }

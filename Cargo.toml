@@ -13,9 +13,9 @@ tokio = { version = "1.48", features = ["sync", "rt", "time"] }
 rand = "0.9"
 ratatui = "0.30"
 rmp3 = { version = "0.3", features = ["float"] }
-sunk = { git = "https://github.com/xeals/sunk", rev = "d07639b5f07aeaba015ef68d343848038230687b" }
 thiserror = "2.0"
-libnotify = "1.0.3"
+libnotify = "1.0.3" # TODO replace this
+submarine = { version = "0.1", features = ["navidrome"] }
 
 serde = { version = "1.0", features = ["derive"] }
 serde-inline-default = "1.0"

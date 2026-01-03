@@ -1,5 +1,5 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode, KeyEvent}, layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}
+	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::Stylize, text::Line, widgets::{Block, Padding, Paragraph, Widget, Wrap}
 };
 
 use crate::music::{MusicProvider, SubsonicProvider};
@@ -13,7 +13,6 @@ impl super::Tab for PlayingTab {
 		if let Event::Key(ev) = event {
 			match ev.code {
 				KeyCode::Enter => self.provider.shuffle_liked(),
-				KeyCode::Char('?') => { self.provider.random_song(); },
 				_ => {},
 			}
 		}
@@ -35,7 +34,7 @@ impl PlayingTab {
 
 
 
-struct PlayingTabWidget(Option<sunk::song::Song>, Vec<sunk::song::Song>);
+struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>);
 
 impl Widget for PlayingTabWidget {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
@@ -91,7 +90,7 @@ impl Widget for PlayingTabWidget {
 					)
 					.gray(),
 				),
-				Line::from(song.content_type.clone().dark_gray()),
+				Line::from(song.content_type.unwrap_or_default().dark_gray()),
 			]
 		} else {
 			vec![]

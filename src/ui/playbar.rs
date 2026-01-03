@@ -74,7 +74,7 @@ impl Widget for Playbar<SubsonicProvider> {
 		let [now, bar, end] = Layout::horizontal([Constraint::Min(5), Constraint::Percentage(100), Constraint::Min(5)]).areas(down);
 
 		let duration = song.and_then(|s| s.duration).unwrap_or_default();
-		let current_time = (duration as f32 * self.0.progress()) as u64;
+		let current_time = (duration as f32 * self.0.progress()) as i32;
 		let remaining = duration - current_time;
 
 		Paragraph::new(format!("{}.{:02}", current_time / 60, current_time % 60))

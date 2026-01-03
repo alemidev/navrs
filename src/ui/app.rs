@@ -55,7 +55,7 @@ impl App {
 		}
 	}
 
-	pub fn run(mut self, mut term: DefaultTerminal) -> sunk::Result<()> {
+	pub fn run(mut self, mut term: DefaultTerminal) -> std::io::Result<()> {
 		self.provider.likes(); // preload them
 
 		loop {

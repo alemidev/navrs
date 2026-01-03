@@ -48,7 +48,7 @@ impl QueueTab {
 
 
 
-struct QueueTabWidget(Vec<sunk::song::Song>);
+struct QueueTabWidget(Vec<submarine::data::Child>);
 
 impl StatefulWidget for QueueTabWidget {
 	type State = ListState;

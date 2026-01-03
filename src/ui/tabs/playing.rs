@@ -20,12 +20,18 @@ impl super::Tab for PlayingTab {
 				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
 				KeyCode::Backspace => { self.provider.dequeue(idx); },
 				KeyCode::Esc => self.state.select(None),
-				KeyCode::Enter => {
+				KeyCode::Char('=') => {
 					if let Some(s) = self.provider.get_at(idx) {
 						self.provider.dequeue(idx);
 						self.provider.enqueue_next(s);
 					}
 				},
+				KeyCode::Enter => {
+					self.provider.set_index(idx);
+					if let Some(song) = self.provider.current() {
+						self.provider.play(song.id);
+					}
+				}
 				// TODO move up and down in queue
 				// KeyCode::PageUp => {},
 				// KeyCode::PageDown => {},

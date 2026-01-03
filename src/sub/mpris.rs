@@ -159,6 +159,7 @@ impl PlayerInterface for SubtuiPlayer {
 
 }
 
+// TODO merge this into ProviderWorker probably
 pub async fn serve(provider: sub::Provider) -> Result<()> {
 	log::info!("preparing MPRIS server");
 	let _server = Server::new("dev.alemi.subtui", SubtuiPlayer(provider)).await?;

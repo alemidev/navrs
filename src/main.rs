@@ -1,6 +1,5 @@
 mod audio;
 mod logger;
-mod mpris;
 mod ui;
 mod config;
 mod ext;
@@ -46,7 +45,7 @@ fn main() {
 		.expect("could not build tokio runtime")
 		.block_on(async move {
 			tokio::spawn(async move { worker.work().await; });
-			match mpris::serve(p).await {
+			match sub::mpris::serve(p).await {
 				Ok(()) => std::future::pending().await,
 				Err(e) => log::error!("error serving over MPRIS: {e}"),
 			}

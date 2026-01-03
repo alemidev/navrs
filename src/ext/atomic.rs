@@ -110,17 +110,20 @@ impl<T: Clone> QueueInner<T> {
 		} else {
 			self.storage.pop_front()
 		};
-		self.snapshot.send(self.storage.clone().into_iter().collect()).ignore();
-		self.peek.send(self.storage.front().cloned()).ignore();
+		self.refresh();
 		x
 	}
 
 	fn push(&mut self, item: T, front: bool) {
 		if front {
-			self.storage.push_back(item);
-		} else {
 			self.storage.push_front(item);
+		} else {
+			self.storage.push_back(item);
 		}
+		self.refresh();
+	}
+
+	fn refresh(&self) {
 		self.snapshot.send(self.storage.clone().into_iter().collect()).ignore();
 		self.peek.send(self.storage.front().cloned()).ignore();
 	}
@@ -165,17 +168,23 @@ impl<T: Clone> Queue<T> {
 			peek,
 			snapshot,
 		};
+		inner.refresh();
 
 
 		Self(Arc::new(Mutex::new(inner)), snapshot_rx, peek_rx)
 	}
 
 	pub async fn remove(&self, idx: usize) -> Option<T> {
-		self.0.lock().await.storage.remove(idx)
+		let mut guard = self.0.lock().await;
+		let res = guard.storage.remove(idx);
+		guard.refresh();
+		res
 	}
 
 	pub async fn clear(&self) {
-		self.0.lock().await.storage.clear();
+		let mut guard = self.0.lock().await;
+		guard.storage.clear();
+		guard.refresh();
 	}
 }
 

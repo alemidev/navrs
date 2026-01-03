@@ -38,8 +38,8 @@ pub trait Buffer<T> {
 
 pub trait Queue<T> {
 	fn current(&self) -> Option<T>;
-	fn upcoming(&self) -> Option<T>;
 	fn index(&self) -> usize;
+	fn set_index(&self, index: usize);
 
 	fn next(&self);
 	fn previous(&self);
@@ -166,11 +166,12 @@ impl Queue<sub::Song> for Provider {
 	fn index(&self) -> usize {
 		self.queue.position()
 	}
+	fn set_index(&self, index: usize) {
+		self.queue.set_position(index);
+	}
+
 	fn current(&self) -> Option<sub::Song> {
 		self.queue.current()
-	}
-	fn upcoming(&self) -> Option<sub::Song> {
-		self.queue.next()
 	}
 
 	fn get_at(&self, index: usize) -> Option<sub::Song> {
@@ -257,6 +258,12 @@ impl ProviderWorker {
 			}
 			if let Some(next) = self.queue.next() {
 				self.preload(next.id).await;
+			}
+
+			for i in 0..5 {
+				if let Some(song) = self.queue.get(self.queue.position() + i) {
+					self.preload(song.id).await;
+				}
 			}
 
 			if std::time::SystemTime::now() > last_fetch + std::time::Duration::from_secs(300) {

@@ -1,4 +1,7 @@
 # subtui
+[![Actions Status](https://github.com/alemidev/subtui/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/alemidev/subtui/actions/workflows/test.yml)
+[![Actions Status](https://github.com/alemidev/subtui/actions/workflows/release.yml/badge.svg)](https://github.com/alemidev/subtui/actions/workflows/release.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/alemidev/subtui)](https://github.com/alemidev/subtui/commits/dev/)
 > terminal music player for subsonic
 
 ![splash](https://cdn.alemi.dev/proj/subtui/screenshot-20260201.png)

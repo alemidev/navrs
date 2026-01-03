@@ -1,8 +1,30 @@
-use std::{collections::VecDeque, sync::Arc};
-
-use tokio::sync::{Mutex, watch};
+use std::sync::Arc;
 
 use crate::ext::err::IgnorableError;
+
+
+
+#[derive(Clone)]
+pub struct Sync<T> {
+	setter: tokio::sync::watch::Sender<T>,
+	_holder: tokio::sync::watch::Receiver<T>,
+}
+
+impl<T: Clone> Sync<T> {
+	pub fn new(x: T) -> Self {
+		let (tx, rx) = tokio::sync::watch::channel(x);
+		Self { setter: tx, _holder: rx }
+	}
+	pub fn get(&self) -> T {
+		self.setter.borrow().clone()
+	}
+	pub fn set(&self, val: T) {
+		self.setter.send(val).ignore();
+	}
+}
+
+
+
 
 #[derive(Debug, Clone, Default)]
 pub struct Flag(Arc<std::sync::atomic::AtomicBool>);
@@ -27,164 +49,150 @@ impl Flag {
 
 
 
+#[derive(Debug, Clone, Default)]
+pub struct Index(Arc<std::sync::atomic::AtomicUsize>);
+impl Index {
+	pub fn new(val: usize) -> Self {
+		Self(Arc::new(std::sync::atomic::AtomicUsize::new(val)))
+	}
+
+	// TODO the orderings!!!! what do they mean??? need to reread the docs ughhh
+	pub fn get(&self) -> usize {
+		self.0.load(std::sync::atomic::Ordering::Relaxed)
+	}
+	pub fn set(&self, val: usize) {
+		self.0.store(val, std::sync::atomic::Ordering::Relaxed);
+	}
+	pub fn inc(&self, val: usize) -> usize {
+		let mut prev = self.get();
+		prev += val;
+		self.set(prev);
+		prev
+	}
+	pub fn dec(&self, val: usize) -> usize {
+		let mut prev = self.get();
+		prev -= val;
+		self.set(prev);
+		prev
+	}
+}
+
+pub fn buffer<T>() -> (BufferHandle<T>, BufferHolder<T>) {
+	let idx = Index::new(0);
+	let (tx, rx) = tokio::sync::watch::channel(Vec::new());
+	(
+		BufferHandle { idx: idx.clone(), setter: tx },
+		BufferHolder { idx, rx },
+	)
+}
+
 #[derive(Clone)]
-pub struct Buffer<T>(Arc<Mutex<BufferInner<T>>>, watch::Receiver<(usize, usize, f32)>);
-struct BufferInner<T> {
-	data: Vec<T>,
-	offset: usize,
-	progress: watch::Sender<(usize, usize, f32)>,
+pub struct BufferHandle<T> {
+	idx: Index,
+	setter: tokio::sync::watch::Sender<Vec<T>>,
 }
 
-impl<T: Clone> BufferInner<T> {
-	fn inner_read(&mut self, n: usize) -> Vec<T> {
-		self.offset += n;
-		self.progress.send((self.offset, self.data.len(), self.offset as f32 / self.data.len() as f32)).ignore();
-		self.data[self.offset - n .. self.offset].to_vec()
-	}
+pub struct BufferHolder<T> {
+	idx: Index,
+	rx: tokio::sync::watch::Receiver<Vec<T>>,
 }
 
-impl<T: Clone> Buffer<T> {
-	pub fn new(data: Vec<T>) -> Self {
-		let (tx, rx) = watch::channel((0, 0, 0.));
-		let inner = Arc::new(Mutex::new(BufferInner {
-			data,
-			offset: 0,
-			progress: tx,
-		}));
+impl<T: Clone + Default> BufferHolder<T> {
+	pub fn read(&self, n: usize) -> Vec<T> {
+		let i = self.idx.get();
+		let l = self.rx.borrow().len();
 
-		Self(inner, rx)
-	}
-
-	#[allow(unused)]
-	pub async fn read(&self, n: usize) -> Vec<T> {
-		self.0.lock().await.inner_read(n)
-	}
-
-	pub fn try_read(&self, n: usize) -> Option<Vec<T>> {
-		match self.0.try_lock() {
-			Ok(mut guard) => Some(guard.inner_read(n)),
-			Err(_) => None,
+		// out of bounds! return flatline
+		if i >= l || n >= l || i + n >= l {
+			// TODO there could be extra leftover data? this way it gets discarded!
+			self.idx.set(l);
+			return vec![T::default(); n];
+			
 		}
+		self.idx.set(i + n);
+		self.rx.borrow()[i .. i+n].to_vec()
 	}
+}
 
-	pub fn progress(&self) -> f32 {
-		self.1.borrow().2
+impl<T: Clone> BufferHandle<T> {
+	pub fn pos(&self) -> usize {
+		self.idx.get()
 	}
 
 	pub fn len(&self) -> usize {
-		self.1.borrow().1
+		self.setter.borrow().len()
 	}
 
-	pub fn offset(&self) -> usize {
-		self.1.borrow().0
+	pub fn seek(&self, pos: usize) {
+		self.idx.set(pos);
 	}
 
-	pub async fn seek(&self, pos: f32) {
-		let mut guard = self.0.lock().await;
-		guard.offset = (guard.data.iter().len() as f32 * pos) as usize;
-		guard.progress.send((guard.offset, guard.data.len(), pos)).ignore();
-	}
-
-	pub async fn set(&self, data: Vec<T>) {
-		let mut guard = self.0.lock().await;
-		guard.offset = 0;
-		guard.data = data;
-		guard.progress.send((guard.offset, guard.data.len(), 0.)).ignore();
+	pub fn set(&self, data: Vec<T>) {
+		self.setter.send(data).ignore();
 	}
 }
 
 
 
 #[derive(Clone)]
-pub struct Queue<T>(Arc<Mutex<QueueInner<T>>>, watch::Receiver<Vec<T>>, watch::Receiver<Option<T>>);
+pub struct Queue<T>(Arc<QueueInner<T>>);
 struct QueueInner<T> {
-	storage: VecDeque<T>,
-	snapshot: watch::Sender<Vec<T>>,
-	peek: watch::Sender<Option<T>>,
-}
-
-impl<T: Clone> QueueInner<T> {
-	fn pop(&mut self, back: bool) -> Option<T> {
-		let x = if back {
-			self.storage.pop_back()
-		} else {
-			self.storage.pop_front()
-		};
-		self.refresh();
-		x
-	}
-
-	fn push(&mut self, item: T, front: bool) {
-		if front {
-			self.storage.push_front(item);
-		} else {
-			self.storage.push_back(item);
-		}
-		self.refresh();
-	}
-
-	fn refresh(&self) {
-		self.snapshot.send(self.storage.clone().into_iter().collect()).ignore();
-		self.peek.send(self.storage.front().cloned()).ignore();
-	}
+	position: Index,
+	setter: tokio::sync::watch::Sender<Vec<T>>,
+	_holder: tokio::sync::watch::Receiver<Vec<T>>,
 }
 
 impl<T: Clone> Queue<T> {
-	pub fn snapshot(&self) -> Vec<T> {
-		self.1.borrow().clone()
+	pub fn new(queue: Vec<T>) -> Self {
+		let (setter, _holder) = tokio::sync::watch::channel(queue);
+		Self(Arc::new(QueueInner { setter, _holder, position: Index::new(0) }))
+	}
+	pub fn len(&self) -> usize {
+		self.0.setter.borrow().len()
+	}
+	pub fn current(&self) -> Option<T> {
+		self.0.setter.borrow().get(self.0.position.get()).cloned()
+	}
+	pub fn next(&self) -> Option<T> {
+		self.0.setter.borrow().get(self.0.position.get() + 1).cloned()
+	}
+	pub fn advance(&self) {
+		self.0.position.inc(1);
+	}
+	pub fn position(&self) -> usize {
+		self.0.position.get()
+	}
+	pub fn set_position(&self, pos: usize) {
+		self.0.position.set(pos);
+	}
+	pub fn set(&self, queue: Vec<T>) {
+		self.0.setter.send_replace(queue);
+		self.0.position.set(0);
+	}
+	pub fn remove(&self, pos: usize) {
+		if pos >= self.len() {
+			return;
+		}
+		self.0.setter.send_modify(|x| { x.remove(pos); });
+		if pos < self.0.position.get() {
+			self.0.position.dec(1);
+		}
 	}
 
-	pub async fn pop(&self) -> Option<T> {
-		self.0.lock().await.pop(false)
+	pub fn insert(&self, pos: usize, val: T) {
+		let idx = self.0.position.get();
+		// TODO load-bearing .insert() ...
+		self.0.setter.send_modify(|data| data.insert(pos, val));
+		if pos > idx {
+			self.0.position.set(idx + 1);
+		}
 	}
 
-	#[allow(unused)]
-	pub async fn pop_back(&self) -> Option<T> {
-		self.0.lock().await.pop(true)
+	pub fn get(&self, pos: usize) -> Option<T> {
+		self.0.setter.borrow().get(pos).cloned()
 	}
 
-	pub fn peek(&self) -> Option<T> {
-		self.2.borrow().clone()
-	}
-
-	#[allow(unused)]
-	pub async fn peek_back(&self) -> Option<T> {
-		self.0.lock().await.storage.back().cloned()
-	}
-
-	pub async fn push(&self, item: T) {
-		self.0.lock().await.push(item, false);
-	}
-
-	pub async fn push_front(&self, item: T) {
-		self.0.lock().await.push(item, true);
-	}
-
-	pub fn new(data: Vec<T>) -> Self {
-		let (peek, peek_rx) = watch::channel(None);
-		let (snapshot, snapshot_rx) = watch::channel(Vec::new());
-		let inner = QueueInner {
-			storage: VecDeque::from(data),
-			peek,
-			snapshot,
-		};
-		inner.refresh();
-
-
-		Self(Arc::new(Mutex::new(inner)), snapshot_rx, peek_rx)
-	}
-
-	pub async fn remove(&self, idx: usize) -> Option<T> {
-		let mut guard = self.0.lock().await;
-		let res = guard.storage.remove(idx);
-		guard.refresh();
-		res
-	}
-
-	pub async fn clear(&self) {
-		let mut guard = self.0.lock().await;
-		guard.storage.clear();
-		guard.refresh();
+	pub fn view(&self) -> Vec<T> {
+		self.0.setter.borrow().clone()
 	}
 }
-

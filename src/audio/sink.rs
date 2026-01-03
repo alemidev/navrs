@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 #[derive(Debug, thiserror::Error)]
@@ -12,23 +14,27 @@ pub enum AudioSinkError {
 	PlayStream(#[from] cpal::PlayStreamError),
 }
 
-pub struct AudioSink {
-	_stream: cpal::Stream,
+#[derive(Clone)]
+pub struct AudioSink<T> {
+	pub buffer: crate::ext::atomic::BufferHandle<T>,
+	_stream: Arc<cpal::Stream>,
 }
 
-impl AudioSink {
-	pub fn init<T: crate::music::MusicProvider<f32> + 'static>(
-		provider: T,
-	) -> Result<Self, AudioSinkError> {
+impl AudioSink<f32> {
+	pub fn init(paused: crate::ext::atomic::Flag) -> Result<Self, AudioSinkError> {
 		let host = cpal::default_host(); // TODO allow choosing host
 		let dev = host.default_output_device().unwrap(); // TODO allow picking, and fallback
 		let cfg = dev.default_output_config()?; // TODO allow changing config
 
+		let (buf_tx, buf_rx) = crate::ext::atomic::buffer();
+
 		let stream = dev.build_output_stream(
 			&cfg.config(),
-			move |data: &mut [f32], _info| match provider.data(data.len()) {
-				Some(d) => data.copy_from_slice(&d),
-				None => data.copy_from_slice(&vec![0f32; data.len()]),
+			move |data: &mut [f32], _info| {
+				if paused.get() {
+					return;
+				}
+				data.copy_from_slice(&buf_rx.read(data.len()));
 			},
 			|e| log::error!("error sending data to sink: {e}"), // TODO reset?
 			None,
@@ -36,6 +42,7 @@ impl AudioSink {
 
 		stream.play()?;
 
-		Ok(Self { _stream: stream })
+		Ok(Self { _stream: Arc::new(stream), buffer: buf_tx })
 	}
 }
+

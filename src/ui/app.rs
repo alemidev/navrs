@@ -7,15 +7,14 @@ use ratatui::{
 };
 
 use crate::{
-	music::{MusicProvider, SubsonicProvider},
-	ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab},
+	sub::{self, provider::{Buffer, Player, Queue}}, ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab}
 };
 
 const SUBTUI: &str = r#"    _   /__/_   .
   _\/_//_// /_// "#;
 
 pub struct App {
-	provider: SubsonicProvider,
+	provider: sub::Provider,
 
 	tab: AppTabs,
 
@@ -30,7 +29,7 @@ pub struct App {
 }
 
 impl App {
-	pub fn new(provider: SubsonicProvider) -> Self {
+	pub fn new(provider: sub::Provider) -> Self {
 		Self {
 			playing_tab: PlayingTab::new(provider.clone()),
 			likes_tab: LikesTab::new(provider.clone()),
@@ -56,7 +55,7 @@ impl App {
 	}
 
 	pub fn run(mut self, mut term: DefaultTerminal) -> std::io::Result<()> {
-		self.provider.likes(); // preload them
+		self.provider.refresh_likes();
 
 		loop {
 			self.flip_flop = !self.flip_flop;
@@ -94,9 +93,7 @@ impl App {
 								KeyCode::Char('3') => self.tab = AppTabs::Search,
 								KeyCode::Char('4') => self.tab = AppTabs::Library,
 								KeyCode::Char('5') => self.tab = AppTabs::Logs,
-								KeyCode::Char(' ') => {
-									self.provider.toggle();
-								}
+								KeyCode::Char(' ') => self.provider.play_pause(),
 								KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
 								KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
 								KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },

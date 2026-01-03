@@ -2,10 +2,10 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, Padding, Paragraph, Wrap}
 };
 
-use crate::music::{MusicProvider, SubsonicProvider};
+use crate::sub::{self, provider::Queue};
 
 pub struct PlayingTab {
-	provider: SubsonicProvider,
+	provider: sub::Provider,
 	state: ListState,
 }
 
@@ -18,11 +18,12 @@ impl super::Tab for PlayingTab {
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
 				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
-				KeyCode::Backspace => { self.provider.pop_queue(idx); },
+				KeyCode::Backspace => { self.provider.dequeue(idx); },
 				KeyCode::Esc => self.state.select(None),
 				KeyCode::Enter => {
-					if let Some(s) = self.provider.pop_queue(idx) {
-						self.provider.play_next(s);
+					if let Some(s) = self.provider.get_at(idx) {
+						self.provider.dequeue(idx);
+						self.provider.enqueue_next(s);
 					}
 				},
 				// TODO move up and down in queue
@@ -36,12 +37,12 @@ impl super::Tab for PlayingTab {
 
 impl super::Renderable for PlayingTab {
 	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
-		frame.render_stateful_widget(PlayingTabWidget(self.provider.current_song(), self.provider.queue()), area, &mut self.state);
+		frame.render_stateful_widget(PlayingTabWidget(self.provider.current(), self.provider.view(), self.provider.index()), area, &mut self.state);
 	}
 }
 
 impl PlayingTab {
-	pub fn new(provider: SubsonicProvider) -> Self {
+	pub fn new(provider: sub::Provider) -> Self {
 		Self { provider, state: ListState::default() }
 	}
 }
@@ -49,7 +50,7 @@ impl PlayingTab {
 
 
 
-struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>);
+struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize);
 
 impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 	type State = ListState;
@@ -75,7 +76,7 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 
 		let up_next= self.1.into_iter().enumerate().map(|(i, s)| {
 			let txt = format!("{} - {} ({})", s.title, s.artist.as_deref().unwrap_or_default(), s.album.as_deref().unwrap_or_default());
-			if i == 0 {
+			if i == self.2 {
 				Line::from(txt.gray().bold())
 			} else {
 				Line::from(txt.italic())

@@ -1,10 +1,10 @@
 mod audio;
 mod logger;
-mod music;
 mod mpris;
 mod ui;
 mod config;
 mod ext;
+mod sub;
 
 use std::str::FromStr;
 
@@ -27,10 +27,17 @@ fn main() {
 		Err(e) => return println!("invalid config: {e}"),
 	};
 
-	// TODO ew but whatever i guess...
-	let (provider, fut) =
-		music::SubsonicProvider::create(cfg.server.base, cfg.auth.username, cfg.auth.password);
-	let _sink = audio::AudioSink::init(provider.clone()).unwrap();
+	let paused = crate::ext::atomic::Flag::new(false);
+
+	let sink = audio::sink::AudioSink::init(paused.clone())
+		.expect("could not create audio sink");
+
+	let auth = submarine::auth::AuthBuilder::new(&cfg.auth.username, "v1.16.1")
+		.client_name("subtui")
+		.hashed(&cfg.auth.password);
+	let client = submarine::Client::new(&cfg.server.base, auth);
+
+	let (provider, worker) = sub::Provider::create(client, sink, paused);
 
 	let p = provider.clone();
 	std::thread::spawn(|| tokio::runtime::Builder::new_current_thread()
@@ -38,7 +45,7 @@ fn main() {
 		.build()
 		.expect("could not build tokio runtime")
 		.block_on(async move {
-			tokio::spawn(fut);
+			tokio::spawn(async move { worker.work().await; });
 			match mpris::serve(p).await {
 				Ok(()) => std::future::pending().await,
 				Err(e) => log::error!("error serving over MPRIS: {e}"),

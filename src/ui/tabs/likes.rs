@@ -2,15 +2,15 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode, KeyModifiers}, layout::Constraint, style::{Style, Stylize}, widgets::{Block, Padding, Row, StatefulWidget, Table, TableState}
 };
 
-use crate::music::{MusicProvider, SubsonicProvider};
+use crate::sub::{self, provider::Queue};
 
 pub struct LikesTab {
 	table: TableState,
-	provider: SubsonicProvider,
+	provider: sub::Provider,
 }
 
 impl LikesTab {
-	pub fn new(provider: SubsonicProvider) -> Self {
+	pub fn new(provider: sub::Provider) -> Self {
 		Self { table: TableState::default(), provider }
 	}
 }
@@ -47,13 +47,13 @@ impl super::Tab for LikesTab {
 				KeyCode::Char('=') => {
 					let idx = self.table.selected().unwrap_or_default();
 					if let Some(song) = self.provider.likes().get(idx) {
-						self.provider.play_next(song.clone());
+						self.provider.enqueue_next(song.clone());
 					}
 				},
 				KeyCode::Char('+') => {
 					let idx = self.table.selected().unwrap_or_default();
 					if let Some(song) = self.provider.likes().get(idx) {
-						self.provider.enqueue(vec![song.clone()]);
+						self.provider.enqueue(song.clone());
 					}
 				},
 				KeyCode::Char('r') => {

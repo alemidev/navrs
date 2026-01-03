@@ -4,16 +4,16 @@ use ratatui::{
 	widgets::{Block, Gauge, Paragraph, Widget, Wrap},
 };
 
-use crate::music::{MusicProvider, SubsonicProvider};
+use crate::sub::{self, provider::{Buffer, Player, Queue}};
 
-pub struct Playbar<T: MusicProvider<f32>>(pub T);
+pub struct Playbar(pub sub::Provider);
 
-impl Widget for Playbar<SubsonicProvider> {
+impl Widget for Playbar {
 	fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
 	where
 		Self: Sized,
 	{
-		let running = self.0.running();
+		let running = !self.0.paused();
 		let block = Block::bordered()
 			.title(if running {
 				" |> playing "
@@ -34,7 +34,7 @@ impl Widget for Playbar<SubsonicProvider> {
 		])
 		.areas(up);
 
-		let song = self.0.current_song();
+		let song = self.0.current();
 
 		Paragraph::new(
 			"artist: ".dark_gray()

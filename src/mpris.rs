@@ -2,9 +2,9 @@ use mpris_server::{
 	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, RootInterface, Server, Time, TrackId, Volume, zbus::{Result, fdo}
 };
 
-use crate::music::{MusicProvider, SubsonicProvider};
+use crate::sub::{self, provider::{Buffer, Player, Queue}};
 
-pub struct SubtuiPlayer(pub SubsonicProvider);
+pub struct SubtuiPlayer(pub sub::Provider);
 
 impl RootInterface for SubtuiPlayer {
 	async fn identity(&self) -> fdo::Result<String> {
@@ -58,7 +58,7 @@ impl PlayerInterface for SubtuiPlayer {
 
 	async fn play_pause(&self) -> fdo::Result<()> {
 		log::info!("MPRIS play/pause!");
-		self.0.toggle();
+		self.0.play_pause();
 		Ok(())
 	}
 
@@ -86,7 +86,7 @@ impl PlayerInterface for SubtuiPlayer {
 	}
 
 	async fn playback_status(&self) -> fdo::Result<PlaybackStatus> {
-		if self.0.running() {
+		if !self.0.paused() {
 			Ok(PlaybackStatus::Playing)
 		} else {
 			Ok(PlaybackStatus::Paused)
@@ -159,7 +159,7 @@ impl PlayerInterface for SubtuiPlayer {
 
 }
 
-pub async fn serve(provider: crate::music::SubsonicProvider) -> Result<()> {
+pub async fn serve(provider: sub::Provider) -> Result<()> {
 	log::info!("preparing MPRIS server");
 	let _server = Server::new("dev.alemi.subtui", SubtuiPlayer(provider)).await?;
 	let _: () = std::future::pending().await;

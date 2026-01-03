@@ -46,11 +46,9 @@ fn main() {
 		})
 	);
 
-	libnotify::init("subtui").expect("could not initialize libnotify");
 	let term = ratatui::init();
 	let res = ui::App::new(provider).run(term);
 	ratatui::restore();
-	libnotify::uninit();
 
 	res.unwrap();
 }

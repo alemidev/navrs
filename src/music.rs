@@ -342,12 +342,14 @@ impl SubsonicProviderActor {
 
 	async fn play(&self, song: Song, data: Vec<f32>) {
 		self.song.send(Some(song.clone())).ignore();
-		if let Err(e) = libnotify::Notification::new(
-			&song.title,
-			Some(format!("{} - {}", song.artist.as_deref().unwrap_or_default(), song.album.as_deref().unwrap_or_default()).as_str()),
-			Some("music"),
-		)
-			.show()
+		if let Err(e) = notify_rust::Notification::new()
+			.summary(&song.title)
+			.body(format!("{} - {}", song.artist.as_deref().unwrap_or_default(), song.album.as_deref().unwrap_or_default()).as_str())
+			.appname("subtui")
+			.icon(song.cover_art.as_deref().unwrap_or_default())
+			.urgency(notify_rust::Urgency::Low)
+			.show_async()
+			.await
 		{
 			log::error!("error showing notification: {e}");
 		}

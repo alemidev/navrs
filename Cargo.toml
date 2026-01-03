@@ -14,7 +14,7 @@ rand = "0.9"
 ratatui = "0.30"
 rmp3 = { version = "0.3", features = ["float"] }
 thiserror = "2.0"
-libnotify = "1.0.3" # TODO replace this
+notify-rust = { version = "4.11", features = ["image"] }
 submarine = { version = "0.1", features = ["navidrome"] }
 
 serde = { version = "1.0", features = ["derive"] }

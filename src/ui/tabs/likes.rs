@@ -59,12 +59,6 @@ impl super::Tab for LikesTab {
 				KeyCode::Char('r') => {
 					self.provider.refresh_likes();
 				},
-				KeyCode::Enter => {
-					let idx = self.table.selected().unwrap_or_default();
-					if let Some(song) = self.provider.likes().get(idx) {
-						self.provider.play(song.id.clone());
-					}
-				},
 				_ => {},
 			}
 		}

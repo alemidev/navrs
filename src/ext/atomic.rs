@@ -40,6 +40,7 @@ impl Flag {
 	pub fn set(&self, val: bool) {
 		self.0.store(val, std::sync::atomic::Ordering::Relaxed);
 	}
+	#[allow(unused)]
 	pub fn toggle(&self) -> bool {
 		let prev = self.get();
 		self.set(!prev);
@@ -153,6 +154,7 @@ impl<T: Clone> Queue<T> {
 	pub fn current(&self) -> Option<T> {
 		self.0.setter.borrow().get(self.0.position.get()).cloned()
 	}
+	#[allow(unused)]
 	pub fn next(&self) -> Option<T> {
 		self.0.setter.borrow().get(self.0.position.get() + 1).cloned()
 	}

@@ -70,6 +70,7 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 		self.get(id).map(|v| v.value().clone())
 	}
 	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, submarine::SubsonicError> {
+		log::info!("streaming song '{id}'...");
 		let song = ctx.stream(
 			id,
 			None,

@@ -1,5 +1,5 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode}, layout::Margin, style::{Style, Stylize}, symbols::scrollbar, text::Line, widgets::{Block, Paragraph, Scrollbar, ScrollbarState, StatefulWidget, Widget, Wrap}
+	crossterm::event::{Event, KeyCode}, layout::Margin, style::{Style, Stylize}, text::Line, widgets::{Block, Paragraph, Scrollbar, ScrollbarState, StatefulWidget, Widget, Wrap}
 };
 
 use crate::ui::modifier_magnitude;

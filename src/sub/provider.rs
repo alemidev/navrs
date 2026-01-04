@@ -26,6 +26,7 @@ pub trait Buffer<T> {
 	fn progress(&self) -> f32;
 	fn seek(&self, pos: f32);
 
+	#[allow(unused)]
 	fn is_empty(&self) -> bool {
 		self.progress() >= 1.
 	}
@@ -50,6 +51,7 @@ pub trait Queue<T> {
 
 	fn enqueue(&self, x: T);
 	fn enqueue_next(&self, x: T);
+	#[allow(unused)]
 	fn enqueue_at(&self, index: usize, x: T);
 
 	fn get_at(&self, index: usize) -> Option<T>;
@@ -333,12 +335,12 @@ impl ProviderWorker {
 							log::info!("searching '{query}'");
 							match self.client.search3(
 								query,
+								Some(50),
 								None,
+								Some(50),
 								None,
+								Some(50),
 								None,
-								None,
-								None,
-								Some(0),
 								None::<String>,
 							)
 								.await
@@ -395,7 +397,6 @@ impl ProviderWorker {
 		match sub::cache::data().load(&id, self.client.clone()).await {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(data) => {
-				log::info!("loaded song data for '{id}'");
 				if let Some(s) = self.queue.current() && s.id == id && self.sink.buffer.len() == 0 {
 					log::info!("setting playback buffer");
 					self.sink.buffer.set(data);

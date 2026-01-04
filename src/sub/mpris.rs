@@ -2,7 +2,7 @@ use mpris_server::{
 	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, RootInterface, Server, Time, TrackId, Volume, zbus::{Result, fdo}
 };
 
-use crate::sub::{self, provider::{Buffer, Player, Queue}};
+use crate::sub::{self, provider::{Player, Queue}};
 
 pub struct SubtuiPlayer(pub sub::Provider);
 

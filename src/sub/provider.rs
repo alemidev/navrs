@@ -282,7 +282,7 @@ impl ProviderWorker {
 							last_fetch = std::time::SystemTime::now();
 						},
 						Some(Op::Search(query)) => {
-							log::info!("searching {query}");
+							log::info!("searching '{query}'");
 							match self.client.search3(
 								query,
 								None,
@@ -326,7 +326,9 @@ impl ProviderWorker {
 		match sub::cache::data().load(&id, self.client.clone()).await {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(data) => {
+				log::info!("loaded song data for '{id}'");
 				if let Some(s) = self.queue.current() && s.id == id && self.sink.buffer.len() == 0 {
+					log::info!("setting playback buffer");
 					self.sink.buffer.set(data);
 				}
 			},
@@ -338,6 +340,7 @@ impl ProviderWorker {
 	}
 
 	async fn reload_likes(&self) {
+		log::info!("reloading likes");
 		self.working.set(true);
 		match self.client.get_starred(None::<String>).await {
 			Ok(data) => self.likes.set(data.song),

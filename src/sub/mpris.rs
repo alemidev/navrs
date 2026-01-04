@@ -47,7 +47,7 @@ impl PlayerInterface for SubtuiPlayer {
 	}
 
 	async fn previous(&self) -> fdo::Result<()> {
-		self.0.restart();
+		self.0.previous();
 		Ok(())
 	}
 

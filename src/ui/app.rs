@@ -96,7 +96,7 @@ impl App {
 									KeyCode::Char('5') => self.tab = AppTabs::Logs,
 									KeyCode::Char(' ') => self.provider.play_pause(),
 									KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
-									KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
+									KeyCode::Char('b') | KeyCode::Char('^') => { self.provider.previous(); }
 									KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
 									KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
 									KeyCode::Tab => self.tab = self.tab.next(),

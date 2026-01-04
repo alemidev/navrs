@@ -13,7 +13,7 @@ impl super::Tab for PlayingTab {
 	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) {
 		if let Event::Key(ev) = event {
 			let modifier = crate::ui::modifier_magnitude(ev) as usize;
-			let idx = self.state.selected().unwrap_or_default();
+			let idx = self.state.selected().unwrap_or(self.provider.index());
 			match ev.code {
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
@@ -41,8 +41,13 @@ impl super::Tab for PlayingTab {
 	}
 }
 
+const SCROLL_PADDING: usize = 3;
+
 impl super::Renderable for PlayingTab {
 	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
+		if self.state.selected().is_none() && self.provider.index() > SCROLL_PADDING {
+			*self.state.offset_mut() = self.provider.index() - SCROLL_PADDING;
+		}
 		frame.render_stateful_widget(PlayingTabWidget(self.provider.current(), self.provider.view(), self.provider.index()), area, &mut self.state);
 	}
 }
@@ -92,7 +97,7 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 		let queue_box = Block::new().padding(Padding::uniform(content.height / 10));
 		List::new(up_next)
 			.block(queue_box)
-			.scroll_padding(5)
+			.scroll_padding(SCROLL_PADDING)
 			.highlight_spacing(ratatui::widgets::HighlightSpacing::Never)
 			.highlight_style(Style::new().white().on_red())
 			.dark_gray()

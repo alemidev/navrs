@@ -34,7 +34,7 @@ impl App {
 			playing_tab: PlayingTab::new(provider.clone()),
 			likes_tab: LikesTab::new(provider.clone()),
 			search_tab: SearchTab::new(provider.clone()),
-			library_tab: LibraryTab::new(),
+			library_tab: LibraryTab::new(provider.clone()),
 			logs_tab: LogsTab::new(),
 
 			tab: AppTabs::Playing,
@@ -56,6 +56,7 @@ impl App {
 
 	pub fn run(mut self, mut term: DefaultTerminal) -> std::io::Result<()> {
 		self.provider.refresh_likes();
+		self.provider.refresh_library();
 
 		loop {
 			self.flip_flop = !self.flip_flop;

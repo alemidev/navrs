@@ -1,3 +1,9 @@
+// TODO this is a nice trait flex but this cache is a bit BAD as it just grows a TON!!
+//      possible solutions:
+//       * auto clean songs too old and back in queue
+//       * store still encoded to save space
+//       * cache to disk instead of in-mem with hashes'n'stuff so we get persistent caching yeaaaa
+
 use std::sync::OnceLock;
 use super::{Song, Id};
 

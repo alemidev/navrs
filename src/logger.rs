@@ -19,7 +19,7 @@ impl log::Log for SimpleLogger {
 				.buffer
 				.write()
 				.unwrap()
-				.push(format!("{} - {}", record.level(), record.args()));
+				.push(format!("{}: {}", record.level(), record.args()));
 		}
 	}
 

@@ -3,7 +3,7 @@
 
 use rand::seq::SliceRandom;
 
-use crate::{ext::{self, err::IgnorableError}, sub::{self, cache::Cache}};
+use crate::{ext::{self, err::IgnorableError}, sub::{self, cache::Cache, Loader}};
 
 pub trait Player {
 	fn paused(&self) -> bool;
@@ -70,6 +70,10 @@ pub struct Provider {
 	queue: ext::atomic::Queue<sub::Song>,
 	likes: ext::atomic::Sync<Vec<sub::Song>>,
 	search: ext::atomic::Sync<Vec<sub::Song>>,
+	// ....
+	pub artists: ext::atomic::Sync<Vec<sub::Artist>>,
+	pub albums: ext::atomic::Sync<Vec<sub::Song>>,
+	pub songs: ext::atomic::Sync<Vec<sub::Song>>,
 	tx: tokio::sync::mpsc::UnboundedSender<Op>,
 }
 
@@ -83,6 +87,9 @@ impl Provider {
 		let likes = ext::atomic::Sync::new(Vec::new());
 		let queue = ext::atomic::Queue::new(Vec::new());
 		let search = ext::atomic::Sync::new(Vec::new());
+		let artists = ext::atomic::Sync::new(Vec::new());
+		let albums = ext::atomic::Sync::new(Vec::new());
+		let songs = ext::atomic::Sync::new(Vec::new());
 		let working = ext::atomic::Flag::new(false);
 		(
 			Provider { 
@@ -93,6 +100,9 @@ impl Provider {
 				queue: queue.clone(),
 				likes: likes.clone(),
 				search: search.clone(),
+				artists: artists.clone(),
+				albums: albums.clone(),
+				songs: songs.clone()
 			},
 			ProviderWorker {
 				likes,
@@ -101,6 +111,9 @@ impl Provider {
 				queue,
 				sink,
 				search,
+				artists,
+				albums,
+				songs,
 				rx,
 			},
 		)
@@ -140,6 +153,12 @@ impl Provider {
 
 	pub fn refresh_likes(&self) {
 		self.tx.send(Op::RefreshLikes).ignore();
+	}
+
+	pub fn refresh_library(&self) {
+		self.tx.send(Op::RefreshArtists).ignore();
+		self.tx.send(Op::RefreshAlbums).ignore();
+		self.tx.send(Op::RefreshSongs).ignore();
 	}
 
 	pub fn search(&self, query: String) {
@@ -214,18 +233,26 @@ impl Queue<sub::Song> for Provider {
 		}
 	}
 	fn previous(&self) {
-		if self.index() > 0 {
-			self.queue.set_position(self.index() - 1);
-			if let Some(s) = self.queue.current() {
-				self.play(s.id);
-				notify_rust::Notification::new()
-					.summary(&s.title)
-					.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
-					.urgency(notify_rust::Urgency::Low)
-					.appname("subtui")
-					.show()
-					.ignore();
+		// if it's the start of a song
+		if self.progress() < 0.05 {
+			// advance in queue, if there's anything next
+			if self.index() > 0 {
+				self.queue.set_position(self.index() - 1);
+				if let Some(s) = self.queue.current() {
+					self.play(s.id);
+					notify_rust::Notification::new()
+						.summary(&s.title)
+						.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
+						.urgency(notify_rust::Urgency::Low)
+						.appname("subtui")
+						.show()
+						.ignore();
+				}
 			}
+		} else {
+			// restart this song
+			self.restart();
+
 		}
 	}
 
@@ -252,6 +279,9 @@ impl Queue<sub::Song> for Provider {
 
 enum Op {
 	RefreshLikes,
+	RefreshArtists,
+	RefreshAlbums,
+	RefreshSongs,
 	Load(sub::Id),
 	Search(String),
 }
@@ -264,11 +294,26 @@ pub struct ProviderWorker {
 	working: ext::atomic::Flag,
 	queue: ext::atomic::Queue<sub::Song>,
 	search: ext::atomic::Sync<Vec<sub::Song>>,
+	// TODO overdoing this a bit... need a better way than 2 channels, ouchh
+	artists: ext::atomic::Sync<Vec<sub::Artist>>,
+	albums: ext::atomic::Sync<Vec<sub::Song>>,
+	songs: ext::atomic::Sync<Vec<sub::Song>>,
 }
 
 impl ProviderWorker {
 	pub async fn work(mut self) {
 		let mut last_fetch = std::time::SystemTime::now();
+
+		// let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+		// tokio::spawn(async move {
+		// 	while let Some(id) = rx.recv().await {
+		// 		self.preload(id).await
+		// 	}
+		// });
+		//
+		//
+		//
+
 		loop {
 			tokio::select! {
 				biased;
@@ -297,6 +342,27 @@ impl ProviderWorker {
 							{
 								Err(e) => log::error!("error searching: {e}"),
 								Ok(x) => self.search.set(x.song),
+							}
+						},
+						Some(Op::RefreshArtists) => {
+							log::info!("refreshing artists...");
+							match self.client.all_artists().await {
+								Err(e) => log::error!("error loading all artists: {e}"),
+								Ok(artists) => self.artists.set(artists),
+							}
+						},
+						Some(Op::RefreshSongs) => {
+							log::info!("refreshing songs...");
+							match self.client.all_songs().await {
+								Err(e) => log::error!("error loading all songs: {e}"),
+								Ok(songs) => self.songs.set(songs),
+							}
+						},
+						Some(Op::RefreshAlbums) => {
+							log::info!("refreshing albums...");
+							match self.client.all_albums().await {
+								Err(e) => log::error!("error loading all albums: {e}"),
+								Ok(albums) => self.albums.set(albums),
 							}
 						},
 					}

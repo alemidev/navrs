@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use ratatui::{
-	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListItem, ListState, StatefulWidget}
+	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::Style, widgets::{Block, List, ListItem, ListState, StatefulWidget}
 };
 
 use crate::{sub::{self, provider::Queue}, ui::modifier_magnitude};
@@ -41,6 +42,7 @@ impl super::Tab for LibraryTab {
 									.get()
 									.iter()
 									.filter(|a| a.artist_id.as_ref().map(|x| *x == artist.id).unwrap_or_default())
+									.sorted_by_key(|a| a.year)
 									.cloned()
 									.collect();
 								self.selected = Area::Albums;
@@ -55,6 +57,7 @@ impl super::Tab for LibraryTab {
 									.get()
 									.iter()
 									.filter(|s| s.album_id.as_ref().map(|x| *x == album.id).unwrap_or_default())
+									.sorted_by_key(|s| s.track)
 									.cloned()
 									.collect();
 								self.selected = Area::Songs;
@@ -138,6 +141,7 @@ impl super::Tab for LibraryTab {
 									.get()
 									.iter()
 									.filter(|s| s.album_id.as_ref().map(|x| *x == album.id).unwrap_or_default())
+									.sorted_by_key(|s| s.track)
 									.cloned()
 									.collect::<Vec<sub::Song>>();
 								if let Some(first) = songs.first().cloned() {
@@ -240,10 +244,9 @@ impl StatefulWidget for LibraryTabWidget {
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
 			.style(if matches!(self.0, Area::Albums) { focused } else { unfocused });
 
-		// TODO sort?
 		let albums_data = self.2
 			.into_iter()
-			.map(|x| ListItem::new(format!("{} -  {}  ({})", x.year.unwrap_or_default(), x.name, x.genre.unwrap_or_default())))
+			.map(|x| ListItem::new(format!("{} - {}", x.year.unwrap_or_default(), x.name)))
 			.collect::<Vec<ListItem>>();
 
 		List::new(albums_data)
@@ -259,10 +262,9 @@ impl StatefulWidget for LibraryTabWidget {
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
 			.style(if matches!(self.0, Area::Songs) { focused } else { unfocused });
 
-		// TODO sort!
 		let songs_data = self.3
 			.into_iter()
-			.map(|x| ListItem::new(format!("#{:02} {}  -  {}", x.track.unwrap_or_default(), x.title, crate::ext::format_secs_duration(x.duration.unwrap_or_default()))))
+			.map(|x| ListItem::new(format!("#{:02} {}", x.track.unwrap_or_default(), x.title)))
 			.collect::<Vec<ListItem>>();
 
 		List::new(songs_data)

@@ -3269,6 +3269,7 @@ dependencies = [
  "clap",
  "cpal",
  "dashmap",
+ "itertools 0.14.0",
  "log",
  "mpris-server",
  "notify-rust",

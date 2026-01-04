@@ -195,11 +195,6 @@ impl Buffer<f32> for Provider {
 			return 0.;
 		}
 
-		// TODO checking here is kind of awful!!!
-		if x >= 1. {
-			self.next();
-		}
-
 		x.clamp(0., 1.)
 	}
 	fn seek(&self, pos: f32) {

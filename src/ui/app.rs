@@ -61,6 +61,10 @@ impl App {
 		loop {
 			self.flip_flop = !self.flip_flop;
 
+			if self.provider.progress() >= 1. {
+				self.provider.next();
+			}
+
 			let _frame = term.draw(|frame| self.draw(frame))?;
 
 			if self.poll_events() {

@@ -225,7 +225,7 @@ impl Queue<sub::Song> for Provider {
 			notify_rust::Notification::new()
 				.summary(&s.title)
 				.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
-				.urgency(notify_rust::Urgency::Low)
+				// .urgency(notify_rust::Urgency::Low)
 				.appname("subtui")
 				.show()
 				.ignore();
@@ -245,7 +245,7 @@ impl Queue<sub::Song> for Provider {
 					notify_rust::Notification::new()
 						.summary(&s.title)
 						.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
-						.urgency(notify_rust::Urgency::Low)
+						// .urgency(notify_rust::Urgency::Low)
 						.appname("subtui")
 						.show()
 						.ignore();

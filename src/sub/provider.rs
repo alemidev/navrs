@@ -145,6 +145,10 @@ impl Provider {
 	pub fn search(&self, query: String) {
 		self.tx.send(Op::Search(query)).ignore();
 	}
+
+	pub fn loading(&self) -> bool {
+		self.sink.buffer.len() == 0
+	}
 }
 
 impl Player for Provider {

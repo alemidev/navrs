@@ -1,6 +1,6 @@
 use ratatui::{
 	layout::{Constraint, Layout},
-	style::{Color, Stylize},
+	style::{Color, Style, Stylize},
 	widgets::{Block, Gauge, Paragraph, Widget, Wrap},
 };
 
@@ -14,14 +14,26 @@ impl Widget for Playbar {
 		Self: Sized,
 	{
 		let running = !self.0.paused();
+		let loading = self.0.loading();
+
+		let style = if loading {
+			Style::new().dark_gray()
+		} else {
+			Style::new().red()
+		};
+
+		let title = if loading {
+			" :: loading "
+		} else if running {
+			" |> playing "
+		} else {
+			" || paused "
+		};
+
 		let block = Block::bordered()
-			.title(if running {
-				" |> playing "
-			} else {
-				" || paused "
-			})
+			.title(title)
 			.title_alignment(ratatui::layout::HorizontalAlignment::Center)
-			.red();
+			.style(style);
 		let inner_playbar = block.inner(area);
 		block.render(area, buf);
 
@@ -87,7 +99,7 @@ impl Widget for Playbar {
 			.render(end, buf);
 
 		Gauge::default()
-			.gauge_style(Color::Red)
+			.gauge_style(style)
 			.ratio(self.0.progress() as f64)
 			.label(format!("{}.{:02}", remaining / 60, remaining % 60))
 			.render(bar, buf);

@@ -117,13 +117,15 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 				Line::from(""),
 				Line::from(
 					format!(
-						"#{} - {}",
+						"#{} - {} plays",
 						song.track.unwrap_or_default(),
-						song.year.unwrap_or_default()
+						song.play_count.unwrap_or_default()
 					)
 					.gray(),
 				),
-				Line::from(song.content_type.unwrap_or_default().dark_gray()),
+				Line::from(format!("{} ({})", song.year.unwrap_or_default(), song.genre.unwrap_or_default()).dark_gray()),
+				Line::from(""),
+				Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
 			]
 		} else {
 			vec![]

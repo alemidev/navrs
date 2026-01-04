@@ -126,6 +126,7 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 				Line::from(format!("{} ({})", song.year.unwrap_or_default(), song.genre.unwrap_or_default()).dark_gray()),
 				Line::from(""),
 				Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
+				Line::from(if song.starred.is_some() { "starred".red() } else { "".dark_gray() }),
 			]
 		} else {
 			vec![]

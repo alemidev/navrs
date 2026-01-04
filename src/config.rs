@@ -9,8 +9,8 @@ pub struct Config {
 	#[serde(default)]
 	pub player: PlayerConfig,
 
-	#[serde(default)]
-	pub transcoding: TranscodingConfig,
+	// #[serde(default)]
+	// pub transcoding: TranscodingConfig,
 }
 
 #[serde_inline_default::serde_inline_default]
@@ -18,9 +18,6 @@ pub struct Config {
 pub struct ServerConfig {
 	#[serde_inline_default("http://localhost:8080/".to_string())]
 	pub base: String,
-
-	#[serde_inline_default(2)]
-	pub preload: usize,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
@@ -36,17 +33,20 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
 #[serde(rename_all = "kebab-case")]
 pub struct PlayerConfig {
-	#[serde(default)]
+	#[serde_inline_default("subtui".to_string())]
 	pub device: String,
+
+	#[serde_inline_default(3)]
+	pub preload: usize,
 }
 
-#[serde_inline_default::serde_inline_default]
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
-#[serde(rename_all = "kebab-case")]
-pub struct TranscodingConfig {
-	#[serde(default)]
-	pub format: String,
-}
+// #[serde_inline_default::serde_inline_default]
+// #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
+// #[serde(rename_all = "kebab-case")]
+// pub struct TranscodingConfig {
+// 	#[serde(default)]
+// 	pub format: String,
+// }
 
 impl Config {
 	pub fn load(path: Option<&std::path::PathBuf>) -> Result<Self, ConfigError> {

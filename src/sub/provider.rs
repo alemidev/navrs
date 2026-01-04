@@ -58,10 +58,6 @@ pub trait Queue<T> {
 	fn dequeue(&self, index: usize);
 }
 
-pub trait Cached<T> {
-	
-}
-
 #[derive(Clone)]
 pub struct Provider {
 	paused: ext::atomic::Flag,
@@ -79,10 +75,15 @@ pub struct Provider {
 
 impl Provider {
 	pub fn create(
-		client: submarine::Client,
+		cfg: crate::config::Config,
 		sink: crate::audio::sink::AudioSink<f32>,
 		paused: ext::atomic::Flag,
 	) -> (Provider, ProviderWorker) {
+		let auth = submarine::auth::AuthBuilder::new(&cfg.auth.username, "v1.16.1")
+			.client_name(&cfg.player.device)
+			.hashed(&cfg.auth.password);
+		let client = submarine::Client::new(&cfg.server.base, auth);
+
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let likes = ext::atomic::Sync::new(Vec::new());
 		let queue = ext::atomic::Queue::new(Vec::new());
@@ -102,7 +103,7 @@ impl Provider {
 				search: search.clone(),
 				artists: artists.clone(),
 				albums: albums.clone(),
-				songs: songs.clone()
+				songs: songs.clone(),
 			},
 			ProviderWorker {
 				likes,
@@ -115,6 +116,7 @@ impl Provider {
 				albums,
 				songs,
 				rx,
+				cfg,
 			},
 		)
 	}
@@ -294,6 +296,7 @@ pub struct ProviderWorker {
 	working: ext::atomic::Flag,
 	queue: ext::atomic::Queue<sub::Song>,
 	search: ext::atomic::Sync<Vec<sub::Song>>,
+	cfg: crate::config::Config,
 	// TODO overdoing this a bit... need a better way than 2 channels, ouchh
 	artists: ext::atomic::Sync<Vec<sub::Artist>>,
 	albums: ext::atomic::Sync<Vec<sub::Song>>,
@@ -372,7 +375,7 @@ impl ProviderWorker {
 
 			}
 
-			for i in 0..5 {
+			for i in 0..self.cfg.player.preload {
 				if let Some(song) = self.queue.get(self.queue.position() + i) {
 					self.preload(song.id).await;
 				}

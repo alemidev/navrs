@@ -31,12 +31,7 @@ fn main() {
 	let sink = audio::sink::AudioSink::init(paused.clone())
 		.expect("could not create audio sink");
 
-	let auth = submarine::auth::AuthBuilder::new(&cfg.auth.username, "v1.16.1")
-		.client_name("subtui")
-		.hashed(&cfg.auth.password);
-	let client = submarine::Client::new(&cfg.server.base, auth);
-
-	let (provider, worker) = sub::Provider::create(client, sink, paused);
+	let (provider, worker) = sub::Provider::create(cfg, sink, paused);
 
 	let p = provider.clone();
 	std::thread::spawn(|| tokio::runtime::Builder::new_current_thread()

@@ -33,7 +33,7 @@ impl App {
 		Self {
 			playing_tab: PlayingTab::new(provider.clone()),
 			likes_tab: LikesTab::new(provider.clone()),
-			search_tab: SearchTab::new(),
+			search_tab: SearchTab::new(provider.clone()),
 			library_tab: LibraryTab::new(),
 			logs_tab: LogsTab::new(),
 
@@ -77,29 +77,30 @@ impl App {
 			Ok(true) => match event::read() {
 				Err(e) => log::error!("err reading event: {e}"),
 				Ok(ev) => {
-					self.tab().handle_input(&ev);
-					match ev {
-						Event::FocusGained => {}
-						Event::FocusLost => {}
-						Event::Paste(_) => {}
-						Event::Resize(_, _) => {}
-						Event::Mouse(_mouse_event) => {}
-						Event::Key(key_event) => {
-							let modifier = crate::ui::modifier_magnitude(&key_event);
-							match key_event.code {
-								KeyCode::Char('q') => return true,
-								KeyCode::Char('1') => self.tab = AppTabs::Playing,
-								KeyCode::Char('2') => self.tab = AppTabs::Likes,
-								KeyCode::Char('3') => self.tab = AppTabs::Search,
-								KeyCode::Char('4') => self.tab = AppTabs::Library,
-								KeyCode::Char('5') => self.tab = AppTabs::Logs,
-								KeyCode::Char(' ') => self.provider.play_pause(),
-								KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
-								KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
-								KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
-								KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
-								KeyCode::Tab => self.tab = self.tab.next(),
-								_ => {}
+					if !self.tab().handle_input(&ev) {
+						match ev {
+							Event::FocusGained => {}
+							Event::FocusLost => {}
+							Event::Paste(_) => {}
+							Event::Resize(_, _) => {}
+							Event::Mouse(_mouse_event) => {}
+							Event::Key(key_event) => {
+								let modifier = crate::ui::modifier_magnitude(&key_event);
+								match key_event.code {
+									KeyCode::Char('q') => return true,
+									KeyCode::Char('1') => self.tab = AppTabs::Playing,
+									KeyCode::Char('2') => self.tab = AppTabs::Likes,
+									KeyCode::Char('3') => self.tab = AppTabs::Search,
+									KeyCode::Char('4') => self.tab = AppTabs::Library,
+									KeyCode::Char('5') => self.tab = AppTabs::Logs,
+									KeyCode::Char(' ') => self.provider.play_pause(),
+									KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
+									KeyCode::Char('r') | KeyCode::Char('^') => { self.provider.restart(); }
+									KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
+									KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
+									KeyCode::Tab => self.tab = self.tab.next(),
+									_ => {}
+								}
 							}
 						}
 					}

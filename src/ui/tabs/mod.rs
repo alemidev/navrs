@@ -8,7 +8,7 @@ pub use likes::LikesTab;
 pub use playing::PlayingTab;
 
 pub trait Tab {
-	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event);
+	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) -> bool;
 }
 
 pub trait Renderable : Tab {

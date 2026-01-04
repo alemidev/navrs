@@ -1,3 +1,6 @@
+// TODO split this down into subfiles
+// TODO maybe the traits are pointless, just expose the atomic stuff beneath?
+
 use rand::seq::SliceRandom;
 
 use crate::{ext::{self, err::IgnorableError}, sub::{self, cache::Cache}};
@@ -66,6 +69,7 @@ pub struct Provider {
 	sink: crate::audio::sink::AudioSink<f32>,
 	queue: ext::atomic::Queue<sub::Song>,
 	likes: ext::atomic::Sync<Vec<sub::Song>>,
+	search: ext::atomic::Sync<Vec<sub::Song>>,
 	tx: tokio::sync::mpsc::UnboundedSender<Op>,
 }
 
@@ -78,6 +82,7 @@ impl Provider {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let likes = ext::atomic::Sync::new(Vec::new());
 		let queue = ext::atomic::Queue::new(Vec::new());
+		let search = ext::atomic::Sync::new(Vec::new());
 		let working = ext::atomic::Flag::new(false);
 		(
 			Provider { 
@@ -87,6 +92,7 @@ impl Provider {
 				working: working.clone(),
 				queue: queue.clone(),
 				likes: likes.clone(),
+				search: search.clone(),
 			},
 			ProviderWorker {
 				likes,
@@ -94,6 +100,7 @@ impl Provider {
 				client,
 				queue,
 				sink,
+				search,
 				rx,
 			},
 		)
@@ -118,6 +125,10 @@ impl Provider {
 		self.likes.get()
 	}
 
+	pub fn search_results(&self) -> Vec<sub::Song> {
+		self.search.get()
+	}
+
 	pub fn shuffle_liked(&self) {
 		let mut queue = self.likes.get();
 		queue.shuffle(&mut rand::rng());
@@ -129,6 +140,10 @@ impl Provider {
 
 	pub fn refresh_likes(&self) {
 		self.tx.send(Op::RefreshLikes).ignore();
+	}
+
+	pub fn search(&self, query: String) {
+		self.tx.send(Op::Search(query)).ignore();
 	}
 }
 
@@ -234,6 +249,7 @@ impl Queue<sub::Song> for Provider {
 enum Op {
 	RefreshLikes,
 	Load(sub::Id),
+	Search(String),
 }
 
 pub struct ProviderWorker {
@@ -243,6 +259,7 @@ pub struct ProviderWorker {
 	client: submarine::Client,
 	working: ext::atomic::Flag,
 	queue: ext::atomic::Queue<sub::Song>,
+	search: ext::atomic::Sync<Vec<sub::Song>>,
 }
 
 impl ProviderWorker {
@@ -259,19 +276,30 @@ impl ProviderWorker {
 						Some(Op::RefreshLikes) => {
 							self.reload_likes().await;
 							last_fetch = std::time::SystemTime::now();
-						}
+						},
+						Some(Op::Search(query)) => {
+							log::info!("searching {query}");
+							match self.client.search3(
+								query,
+								None,
+								None,
+								None,
+								None,
+								None,
+								Some(0),
+								None::<String>,
+							)
+								.await
+							{
+								Err(e) => log::error!("error searching: {e}"),
+								Ok(x) => self.search.set(x.song),
+							}
+						},
 					}
 				},
 
 				_ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {},
 
-			}
-
-			if let Some(current) = self.queue.current() {
-				self.preload(current.id).await;
-			}
-			if let Some(next) = self.queue.next() {
-				self.preload(next.id).await;
 			}
 
 			for i in 0..5 {

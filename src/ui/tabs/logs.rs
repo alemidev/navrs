@@ -10,7 +10,7 @@ pub struct LogsTab {
 }
 
 impl super::Tab for LogsTab {
-	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) {
+	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) -> bool {
 		if let Event::Key(ev) = event {
 			let modifier = modifier_magnitude(ev) as u16;
 			match ev.code {
@@ -19,6 +19,8 @@ impl super::Tab for LogsTab {
 				_ => {},
 			}
 		}
+
+		false
 	}
 }
 

@@ -1,8 +1,8 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode, KeyModifiers}, layout::Constraint, style::{Style, Stylize}, widgets::{Block, Padding, Row, StatefulWidget, Table, TableState}
+	crossterm::event::{Event, KeyCode}, layout::Constraint, style::{Style, Stylize}, widgets::{Block, Padding, Row, StatefulWidget, Table, TableState}
 };
 
-use crate::sub::{self, provider::Queue};
+use crate::{sub::{self, provider::Queue}, ui::modifier_magnitude};
 
 pub struct LikesTab {
 	table: TableState,
@@ -16,13 +16,9 @@ impl LikesTab {
 }
 
 impl super::Tab for LikesTab {
-	fn handle_input(&mut self, event: &Event) {
+	fn handle_input(&mut self, event: &Event) -> bool {
 		if let Event::Key(ev) = event {
-			let modifier = if ev.modifiers.contains(KeyModifiers::SHIFT) {
-				5
-			} else {
-				1
-			};
+			let modifier = modifier_magnitude(ev) as usize;
 
 			match ev.code {
 				KeyCode::Up => {
@@ -62,6 +58,8 @@ impl super::Tab for LikesTab {
 				_ => {},
 			}
 		}
+
+		false
 	}
 }
 

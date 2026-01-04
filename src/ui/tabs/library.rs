@@ -6,7 +6,7 @@ use ratatui::{
 pub struct LibraryTab;
 
 impl super::Tab for LibraryTab {
-	fn handle_input(&mut self, _event: &ratatui::crossterm::event::Event) {}
+	fn handle_input(&mut self, _event: &ratatui::crossterm::event::Event) -> bool { false }
 }
 
 impl super::Renderable for LibraryTab {

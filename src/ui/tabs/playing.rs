@@ -10,7 +10,7 @@ pub struct PlayingTab {
 }
 
 impl super::Tab for PlayingTab {
-	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) {
+	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) -> bool {
 		if let Event::Key(ev) = event {
 			let modifier = crate::ui::modifier_magnitude(ev) as usize;
 			let idx = self.state.selected().unwrap_or(self.provider.index());
@@ -38,6 +38,8 @@ impl super::Tab for PlayingTab {
 				_ => {},
 			}
 		}
+
+		false
 	}
 }
 

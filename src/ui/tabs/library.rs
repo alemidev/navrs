@@ -1,5 +1,5 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, StatefulWidget}
+	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListItem, ListState, StatefulWidget}
 };
 
 use crate::{sub::{self, provider::Queue}, ui::modifier_magnitude};
@@ -225,7 +225,7 @@ impl StatefulWidget for LibraryTabWidget {
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
 			.style(if matches!(self.0, Area::Artists) { focused } else { unfocused });
 
-		let artists_data = self.1.into_iter().map(|x| Line::from(x.name)).collect::<Vec<Line>>();
+		let artists_data = self.1.into_iter().map(|x| ListItem::new(x.name)).collect::<Vec<ListItem>>();
 
 		List::new(artists_data)
 			.block(artists_block)
@@ -243,8 +243,8 @@ impl StatefulWidget for LibraryTabWidget {
 		// TODO sort?
 		let albums_data = self.2
 			.into_iter()
-			.map(|x| Line::from(format!("{} - {}", x.year.unwrap_or_default(), x.name)))
-			.collect::<Vec<Line>>();
+			.map(|x| ListItem::new(format!("{} -  {}  ({})", x.year.unwrap_or_default(), x.name, x.genre.unwrap_or_default())))
+			.collect::<Vec<ListItem>>();
 
 		List::new(albums_data)
 			.block(albums_block)
@@ -262,8 +262,8 @@ impl StatefulWidget for LibraryTabWidget {
 		// TODO sort!
 		let songs_data = self.3
 			.into_iter()
-			.map(|x| Line::from(format!("#{:02} {}", x.track.unwrap_or_default(), x.title)))
-			.collect::<Vec<Line>>();
+			.map(|x| ListItem::new(format!("#{:02} {}  -  {}", x.track.unwrap_or_default(), x.title, crate::ext::format_secs_duration(x.duration.unwrap_or_default()))))
+			.collect::<Vec<ListItem>>();
 
 		List::new(songs_data)
 			.block(songs_block)

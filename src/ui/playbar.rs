@@ -89,11 +89,11 @@ impl Widget for Playbar {
 		let current_time = (duration as f32 * self.0.progress()) as i32;
 		let remaining = duration - current_time;
 
-		Paragraph::new(format!("{}.{:02}", current_time / 60, current_time % 60))
+		Paragraph::new(crate::ext::format_secs_duration(current_time))
 			.dark_gray()
 			.render(now, buf);
 
-		Paragraph::new(format!("{}.{:02}", duration / 60, duration % 60))
+		Paragraph::new(crate::ext::format_secs_duration(duration))
 			.right_aligned()
 			.dark_gray()
 			.render(end, buf);
@@ -101,7 +101,7 @@ impl Widget for Playbar {
 		Gauge::default()
 			.gauge_style(style)
 			.ratio(self.0.progress() as f64)
-			.label(format!("{}.{:02}", remaining / 60, remaining % 60))
+			.label(crate::ext::format_secs_duration(remaining))
 			.render(bar, buf);
 	}
 }

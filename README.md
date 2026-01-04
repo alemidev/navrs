@@ -6,15 +6,19 @@
 
 ![splash](https://cdn.alemi.dev/proj/subtui/screenshot-20260201.png)
 
-> [!CAUTION]
-> this project somewhat works but it's a rushed 1-day proof of concept, expect issues
-
 ## usage
-currently there are no config files, just
-```sh
-$ subtui --host https://my.subsonic.com/ --username admin --password 1234
+before running `subtui` you must configure your credentials: in `$HOME/.config/subtui/config.toml` manage subtui configuration:
+
+```toml
+[server]
+base = "https://my.subsonic.com"
+
+[auth]
+username = "your-username"
+password = "your-password"
 ```
-and it will launch the TUI
+
+then just running `subtui` will start the TUI and load your favorites
 
 ### keybinds
  * `q`: exit
@@ -22,13 +26,12 @@ and it will launch the TUI
  * `space`: play/pause
  * `n`: next song
  * `r`: restart song
- * `enter`: on playing screen, shuffle all favorites
+ * `s`: on playing screen, shuffle all favorites
  * `up/down`: on lists, move cursor
  * `left/right`: move playhead
- * `shift`: modifier for faster scrolling/skipping/...
+ * `shift/alt`: modifier for faster scrolling/skipping/...
  * `+`: append to queue
  * `=`: play next
- * `?`: random song
 
  ## building
 ```sh

@@ -28,7 +28,7 @@ impl AppTabs {
 	pub fn next(self) -> Self {
 		match self {
 			Self::Playing => Self::Likes,
-			Self::Likes => Self::Library,
+			Self::Likes => Self::Search,
 			Self::Search => Self::Library,
 			Self::Library => Self::Logs,
 			Self::Logs => Self::Playing,

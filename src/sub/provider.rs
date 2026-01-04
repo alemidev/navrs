@@ -172,6 +172,10 @@ impl Provider {
 	pub fn loading(&self) -> bool {
 		self.sink.buffer.len() == 0
 	}
+
+	pub fn scrobble(&self, id: sub::Id) {
+		self.tx.send(Op::Scrobble(id)).ignore();
+	}
 }
 
 impl Player for Provider {
@@ -221,6 +225,10 @@ impl Queue<sub::Song> for Provider {
 	}
 
 	fn next(&self) {
+		if self.progress() > 0.75 && let Some(s) = self.current() {
+			self.scrobble(s.id);
+		}
+
 		self.queue.advance();
 		if let Some(s) = self.queue.current() {
 			self.play(s.id);
@@ -288,6 +296,7 @@ enum Op {
 	RefreshSongs,
 	Load(sub::Id),
 	Search(String),
+	Scrobble(sub::Id),
 }
 
 pub struct ProviderWorker {
@@ -368,6 +377,12 @@ impl ProviderWorker {
 							match self.client.all_albums().await {
 								Err(e) => log::error!("error loading all albums: {e}"),
 								Ok(albums) => self.albums.set(albums),
+							}
+						},
+						Some(Op::Scrobble(id)) => {
+							log::info!("scrobbling play of '{id}'");
+							if let Err(e) = self.client.scrobble(vec![(id, None)], Some(true)).await {
+								log::error!("error scrobbling song: {e}");
 							}
 						},
 					}

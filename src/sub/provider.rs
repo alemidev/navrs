@@ -234,7 +234,7 @@ impl Queue<sub::Song> for Provider {
 	}
 	fn previous(&self) {
 		// if it's the start of a song
-		if self.progress() < 0.05 {
+		if self.progress() < 0.01 {
 			// advance in queue, if there's anything next
 			if self.index() > 0 {
 				self.queue.set_position(self.index() - 1);

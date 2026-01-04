@@ -4,7 +4,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/alemidev/subtui)](https://github.com/alemidev/subtui/commits/dev/)
 > terminal music player for subsonic
 
-![splash](https://cdn.alemi.dev/proj/subtui/screenshot-20260201.png)
+![demo-gif](https://cdn.alemi.dev/proj/subtui/demo-20260104.gif)
 
 ## usage
 before running `subtui` you must configure your credentials: in `$HOME/.config/subtui/config.toml` manage subtui configuration:

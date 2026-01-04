@@ -16,6 +16,10 @@ base = "https://my.subsonic.com"
 [auth]
 username = "your-username"
 password = "your-password"
+
+[player]
+device = "subtui" # optional
+preload = 3 # optional
 ```
 
 then just running `subtui` will start the TUI and load your favorites

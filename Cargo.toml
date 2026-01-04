@@ -2,6 +2,12 @@
 name = "subtui"
 version = "0.1.0"
 edition = "2024"
+authors = [ "alemi <me@alemi.dev>" ]
+description = "subsonic client, music player in your terminal"
+license = "GPL-3.0"
+keywords = ["cli", "tui", "audio", "subsonic", "music"]
+repository = "https://github.com/alemidev/subtui"
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

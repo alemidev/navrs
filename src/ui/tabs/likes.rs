@@ -95,12 +95,13 @@ impl StatefulWidget for LikesTabWidget {
 			Constraint::Min(30),
 			Constraint::Min(15),
 			Constraint::Min(15),
+			Constraint::Min(5),
 		];
 
 		Table::new(rows, widths)
 			.block(block)
 			.header(
-				Row::new(["TITLE", "ARTIST", "ALBUM"])
+				Row::new(["TITLE", "ARTIST", "ALBUM", "PLAY COUNT"])
 					.white()
 					.on_black()
 					.bold(),
@@ -125,6 +126,7 @@ fn song_into_row<'a>(song: submarine::data::Child) -> Row<'a> {
 		song.title.clone(),
 		song.artist.clone().unwrap_or_default(),
 		song.album.clone().unwrap_or_default(),
+		song.play_count.unwrap_or_default().to_string(),
 	])
 	.white()
 }

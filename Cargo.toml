@@ -1,6 +1,6 @@
 [package]
 name = "subtui"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 authors = [ "alemi <me@alemi.dev>" ]
 description = "subsonic client, music player in your terminal"
@@ -21,10 +21,23 @@ ratatui = "0.30"
 rmp3 = { version = "0.3", features = ["float"] }
 thiserror = "2.0"
 itertools = "0.14"
-notify-rust = { version = "4.11", features = ["image"] }
-submarine = { version = "0.1", features = ["navidrome"] }
+notify-rust = "4.11"
+submarine = "0.1"
 
 serde = { version = "1.0", features = ["derive"] }
 serde-inline-default = "1.0"
 serde_default = "0.2"
 toml = "0.9"
+
+[features]
+default = []
+navidrome = ["submarine/navidrome"]
+image = ["notify-rust/image"]
+
+
+[profile.release]    # make small binaries! will take quite longer, from https://github.com/johnthagen/min-sized-rust
+opt-level = 'z'      # optimize for size
+lto = true           # enable Link Time Optimisation: don't link unused stuff
+codegen-units = 1    # reducing codegen units slows it down but allows for better optimization
+panic = 'abort'      # abort on panic: don't include code to show what went wrong in release
+strip = "symbols"    # strip symbols from binary: have fun debugging on prod! :)

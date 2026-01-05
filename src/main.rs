@@ -11,6 +11,7 @@ use clap::Parser;
 
 /// A TUI Subsonic music player
 #[derive(Parser)]
+#[clap(version, author)]
 struct Cli {
 	/// path to a specific config file, otherwise searches .config/subtui/config.toml
 	#[arg(short, long)]

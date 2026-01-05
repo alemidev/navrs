@@ -313,84 +313,93 @@ impl ProviderWorker {
 	pub async fn work(mut self) {
 		let mut last_fetch = std::time::SystemTime::now();
 
-		// let (tx, mut rx) = tokio::sync::mpsc::channel(10);
-		// tokio::spawn(async move {
-		// 	while let Some(id) = rx.recv().await {
-		// 		self.preload(id).await
-		// 	}
-		// });
-		//
-		//
-		//
+		// TODO ughh yet another bunch of copies.......
+		let _client = self.client.clone();
+		let _sink = self.sink.clone();
+		let _queue = self.queue.clone();
+		let _working = self.working.clone();
+		let _preload = self.cfg.player.preload;
+		let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+		tokio::spawn(async move {
+			loop {
+				tokio::select! {
+					biased;
 
-		loop {
-			tokio::select! {
-				biased;
-
-				op = self.rx.recv() => {
-					match op {
+					res = rx.recv() => match res {
 						None => break,
-						Some(Op::Load(id)) => self.preload(id).await,
-						Some(Op::RefreshLikes) => {
-							self.reload_likes().await;
-							last_fetch = std::time::SystemTime::now();
+						Some(id) => {
+							_working.set(true);
+							Self::preload(id, &_client, &_sink, &_queue).await;
+							_working.set(false);
 						},
-						Some(Op::Search(query)) => {
-							log::info!("searching '{query}'");
-							match self.client.search3(
-								query,
-								Some(50),
-								None,
-								Some(50),
-								None,
-								Some(50),
-								None,
-								None::<String>,
-							)
-								.await
-							{
-								Err(e) => log::error!("error searching: {e}"),
-								Ok(x) => self.search.set(x.song),
-							}
-						},
-						Some(Op::RefreshArtists) => {
-							log::info!("refreshing artists...");
-							match self.client.all_artists().await {
-								Err(e) => log::error!("error loading all artists: {e}"),
-								Ok(artists) => self.artists.set(artists),
-							}
-						},
-						Some(Op::RefreshSongs) => {
-							log::info!("refreshing songs...");
-							match self.client.all_songs().await {
-								Err(e) => log::error!("error loading all songs: {e}"),
-								Ok(songs) => self.songs.set(songs),
-							}
-						},
-						Some(Op::RefreshAlbums) => {
-							log::info!("refreshing albums...");
-							match self.client.all_albums().await {
-								Err(e) => log::error!("error loading all albums: {e}"),
-								Ok(albums) => self.albums.set(albums),
-							}
-						},
-						Some(Op::Scrobble(id)) => {
-							log::info!("scrobbling play of '{id}'");
-							if let Err(e) = self.client.scrobble(vec![(id, None)], Some(true)).await {
-								log::error!("error scrobbling song: {e}");
-							}
-						},
+					},
+
+					_ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {},
+
+				}
+
+				_working.set(true);
+				for i in 0.._preload {
+					if let Some(song) = _queue.get(_queue.position() + i) {
+						Self::preload(song.id, &_client, &_sink, &_queue).await;
+					}
+				}
+				_working.set(false);
+			}
+		});
+
+		while let Some(op) = self.rx.recv().await {
+			match op {
+				Op::Load(id) => tx.send(id).await.ignore(),
+				Op::RefreshLikes => {
+					self.reload_likes().await;
+					last_fetch = std::time::SystemTime::now();
+				},
+				Op::Search(query) => {
+					log::info!("searching '{query}'");
+					match self.client.search3(
+						query,
+						Some(50),
+						None,
+						Some(50),
+						None,
+						Some(50),
+						None,
+						None::<String>,
+					)
+						.await
+					{
+						Err(e) => log::error!("error searching: {e}"),
+						Ok(x) => self.search.set(x.song),
 					}
 				},
-
-				_ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {},
-
-			}
-
-			for i in 0..self.cfg.player.preload {
-				if let Some(song) = self.queue.get(self.queue.position() + i) {
-					self.preload(song.id).await;
-				}
+				Op::RefreshArtists => {
+					log::info!("refreshing artists...");
+					match self.client.all_artists().await {
+						Err(e) => log::error!("error loading all artists: {e}"),
+						Ok(artists) => self.artists.set(artists),
+					}
+				},
+				Op::RefreshSongs => {
+					log::info!("refreshing songs...");
+					match self.client.all_songs().await {
+						Err(e) => log::error!("error loading all songs: {e}"),
+						Ok(songs) => self.songs.set(songs),
+					}
+				},
+				Op::RefreshAlbums => {
+					log::info!("refreshing albums...");
+					match self.client.all_albums().await {
+						Err(e) => log::error!("error loading all albums: {e}"),
+						Ok(albums) => self.albums.set(albums),
+					}
+				},
+				Op::Scrobble(id) => {
+					log::info!("scrobbling play of '{id}'");
+					if let Err(e) = self.client.scrobble(vec![(id, None)], Some(true)).await {
+						log::error!("error scrobbling song: {e}");
+					}
+				},
 			}
 
 			if std::time::SystemTime::now() > last_fetch + std::time::Duration::from_secs(300) {
@@ -402,21 +411,20 @@ impl ProviderWorker {
 		log::info!("provider worker quitting");
 	}
 
-	async fn preload(&self, id: sub::Id) {
-		self.working.set(true);
-		match sub::cache::data().load(&id, self.client.clone()).await {
+	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioSink<f32>, queue: &ext::atomic::Queue<sub::Song>) {
+		match sub::cache::data().prime(&id, client.clone()).await {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
-			Ok(data) => {
-				if let Some(s) = self.queue.current() && s.id == id && self.sink.buffer.len() == 0 {
+			Ok(()) => {
+				if let Some(s) = queue.current() && s.id == id && sink.buffer.len() == 0 {
+					let data = sub::cache::data().lookup(&id).expect("just primed");
 					log::info!("setting playback buffer");
-					self.sink.buffer.set(data);
+					sink.buffer.set(data);
 				}
 			},
 		}
-		if let Err(e) = sub::cache::meta().load(&id, self.client.clone()).await {
+		if let Err(e) = sub::cache::meta().prime(&id, client.clone()).await {
 			log::error!("error preloading meta for song '{id}': {e}")
 		}
-		self.working.set(false);
 	}
 
 	async fn reload_likes(&self) {

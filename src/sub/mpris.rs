@@ -32,13 +32,18 @@ impl PlayerInterface for SubtuiPlayer {
 	async fn set_volume(&self, _volume: Volume) -> Result<()> { Ok(()) } // TODO need volume...
 
 	async fn metadata(&self) -> fdo::Result<Metadata> {
-		let metadata = Metadata::builder()
-			.title("My Song")
-			.artist(["My Artist"])
-			.album("My Album")
-			.length(Time::from_micros(123))
-			.build();
-		Ok(metadata)
+		if let Some(song) = self.0.current() {
+			Ok(
+				Metadata::builder()
+					.title(song.title)
+					.artist([song.artist.unwrap_or_default()])
+					.album(song.album.unwrap_or_default())
+					.length(Time::from_secs(song.duration.unwrap_or_default() as i64))
+					.build()
+			)
+		} else {
+			Ok(Metadata::new())
+		}
 	}
 
 	async fn next(&self) -> fdo::Result<()> {

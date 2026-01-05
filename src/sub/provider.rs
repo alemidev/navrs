@@ -443,11 +443,9 @@ impl ProviderWorker {
 
 	async fn reload_likes(&self) {
 		log::info!("reloading likes");
-		self.working.set(true);
 		match self.client.get_starred(None::<String>).await {
 			Ok(data) => self.likes.set(data.song),
 			Err(e) => log::error!("error fetching likes: {e}"),
 		}
-		self.working.set(false);
 	}
 }

@@ -268,12 +268,15 @@ impl Queue<sub::Song> for Provider {
 	}
 	fn enqueue(&self, x: sub::Song) {
 		self.queue.insert(self.queue.len(), x);
+		self.tx.send(Op::Preload).ignore();
 	}
 	fn enqueue_next(&self, x: sub::Song) {
 		self.queue.insert(self.queue.position() + 1, x);
+		self.tx.send(Op::Preload).ignore();
 	}
 	fn enqueue_at(&self, index: usize, x: sub::Song) {
 		self.queue.insert(index, x);
+		self.tx.send(Op::Preload).ignore();
 	}
 	fn dequeue(&self, index: usize) {
 		self.queue.remove(index);
@@ -289,6 +292,7 @@ enum Op {
 	RefreshArtists,
 	RefreshAlbums,
 	RefreshSongs,
+	Preload,
 	Load(sub::Id),
 	Search(String),
 	Scrobble(sub::Id),
@@ -327,7 +331,8 @@ impl ProviderWorker {
 
 					res = rx.recv() => match res {
 						None => break,
-						Some(id) => {
+						Some(None) => {}, // just wake up
+						Some(Some(id)) => {
 							_working.set(true);
 							Self::preload(id, &_client, &_sink, &_queue).await;
 							_working.set(false);
@@ -350,7 +355,8 @@ impl ProviderWorker {
 
 		while let Some(op) = self.rx.recv().await {
 			match op {
-				Op::Load(id) => tx.send(id).await.ignore(),
+				Op::Preload => tx.send(None).await.ignore(),
+				Op::Load(id) => tx.send(Some(id)).await.ignore(),
 				Op::RefreshLikes => {
 					self.reload_likes().await;
 					last_fetch = std::time::SystemTime::now();

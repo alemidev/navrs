@@ -95,13 +95,13 @@ impl StatefulWidget for LikesTabWidget {
 			Constraint::Min(30),
 			Constraint::Min(15),
 			Constraint::Min(15),
-			Constraint::Min(5),
+			Constraint::Length(5),
 		];
 
 		Table::new(rows, widths)
 			.block(block)
 			.header(
-				Row::new(["TITLE", "ARTIST", "ALBUM", "PLAY COUNT"])
+				Row::new(["TITLE", "ARTIST", "ALBUM", "PLAYS"])
 					.white()
 					.on_black()
 					.bold(),

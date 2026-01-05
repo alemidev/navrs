@@ -111,6 +111,7 @@ impl StatefulWidget for SearchTabWidget {
 		let query_border = Block::bordered()
 			.title("search")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(ratatui::widgets::BorderType::Rounded)
 			.style(if self.2 { active_style } else { inactive_style });
 
 		{
@@ -125,6 +126,7 @@ impl StatefulWidget for SearchTabWidget {
 			.title("results")
 			.padding(Padding::uniform(2))
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(ratatui::widgets::BorderType::Rounded)
 			.style(if self.2 { inactive_style } else { active_style });
 
 		let (heade,rows, widths) = crate::ext::tabularize(self.1);

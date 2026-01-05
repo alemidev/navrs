@@ -48,6 +48,12 @@ fn main() {
 		})
 	);
 
+	let hook = std::panic::take_hook();
+	std::panic::set_hook(Box::new(move |panic_info| {
+		ratatui::restore();
+		hook(panic_info);
+	}));
+
 	let term = ratatui::init();
 	let res = ui::App::new(provider).run(term);
 	ratatui::restore();

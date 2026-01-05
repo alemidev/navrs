@@ -33,9 +33,20 @@ impl super::Tab for PlayingTab {
 						self.provider.play(song.id);
 					}
 				}
-				// TODO move up and down in queue
-				// KeyCode::PageUp => {},
-				// KeyCode::PageDown => {},
+				KeyCode::PageUp => {
+					if let Some(s) = self.provider.get_at(idx) {
+						self.provider.dequeue(idx);
+						self.provider.enqueue_at(idx.saturating_sub(1), s);
+						self.state.select_previous();
+					}
+				},
+				KeyCode::PageDown => {
+					if let Some(s) = self.provider.get_at(idx) {
+						self.provider.dequeue(idx);
+						self.provider.enqueue_at(idx.saturating_add(1), s);
+						self.state.select_next();
+					}
+				},
 				_ => {},
 			}
 		}

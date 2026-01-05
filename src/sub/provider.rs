@@ -264,7 +264,15 @@ impl Queue<sub::Song> for Provider {
 	}
 
 	fn reset(&self, data: Vec<sub::Song>) {
-		self.queue.set(data);
+		self.queue.set(data.clone());
+		if let Some(f) = data.first() {
+			self.play(f.id.clone());
+		} else {
+			// cleared the queue, stop playback
+			self.sink.buffer.set(Vec::new());
+			self.sink.buffer.seek(0);
+		}
+		
 	}
 	fn enqueue(&self, x: sub::Song) {
 		self.queue.insert(self.queue.len(), x);

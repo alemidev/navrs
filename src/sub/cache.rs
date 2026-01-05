@@ -14,20 +14,36 @@ pub trait Cache<T: Clone + Sync> {
 	type Error: std::error::Error + Send;
 	type Fetcher: Send;
 
+	fn contains(&self, id: &Id) -> bool;
 	fn put(&self, id: Id, val: T);
 	fn lookup(&self, id: &Id) -> Option<T>;
 	fn fetch(&self, id: &Id, ctx: Self::Fetcher) -> impl std::future::Future<Output = Result<T, Self::Error>> + std::marker::Send;
 
+
+	#[allow(unused)]
 	fn load(&self, id: &Id, ctx: Self::Fetcher) -> impl std::future::Future<Output = Result<T, Self::Error>> + std::marker::Send
 	where Self: Sync
 	{
 		async {
-			if let Some(x) = self.lookup(id) {
+			if self.contains(id) && let Some(x) = self.lookup(id) {
 				return Ok(x);
 			}
 			let x = self.fetch(id, ctx).await?;
 			self.put(id.clone(), x.clone());
 			Ok(x)
+		}
+	}
+
+	fn prime(&self, id: &Id, ctx: Self::Fetcher) -> impl std::future::Future<Output = Result<(), Self::Error>> + std::marker::Send
+	where Self: Sync
+	{
+		async {
+			if self.contains(id) {
+				return Ok(());
+			}
+			let x = self.fetch(id, ctx).await?;
+			self.put(id.clone(), x.clone());
+			Ok(())
 		}
 	}
 }
@@ -42,6 +58,9 @@ impl Cache<Song> for DashMap<Id, Song> {
 	type Error = submarine::SubsonicError;
 	type Fetcher = submarine::Client;
 
+	fn contains(&self, id: &Id) -> bool {
+		self.contains_key(id)
+	}
 	fn put(&self, id: Id, val: Song) {
 		self.insert(id, val);
 	}
@@ -63,6 +82,9 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 	type Error = submarine::SubsonicError;
 	type Fetcher = submarine::Client;
 
+	fn contains(&self, id: &Id) -> bool {
+		self.contains_key(id)
+	}
 	fn put(&self, id: Id, val: Vec<f32>) {
 		self.insert(id, val);
 	}

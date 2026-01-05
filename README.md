@@ -19,7 +19,7 @@ password = "your-password"
 
 [player]
 device = "subtui" # optional
-preload = 3 # optional
+preload = 5 # optional
 ```
 
 then just running `subtui` will start the TUI and load your favorites

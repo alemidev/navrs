@@ -36,7 +36,7 @@ pub struct PlayerConfig {
 	#[serde_inline_default("subtui".to_string())]
 	pub device: String,
 
-	#[serde_inline_default(3)]
+	#[serde_inline_default(5)]
 	pub preload: usize,
 }
 

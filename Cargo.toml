@@ -32,6 +32,7 @@ toml = "0.9"
 
 [features]
 default = []
+rounded = []
 navidrome = ["submarine/navidrome"]
 image = ["notify-rust/image"]
 

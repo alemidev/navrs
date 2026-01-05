@@ -88,7 +88,7 @@ impl StatefulWidget for LikesTabWidget {
 			.padding(Padding::uniform(2))
 			.title("liked songs")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
-			.border_type(ratatui::widgets::BorderType::Rounded)
+			.border_type(crate::ui::BORDER_STYLE)
 			.dark_gray();
 
 		let rows = self.0.into_iter().map(song_into_row).collect::<Vec<Row>>();

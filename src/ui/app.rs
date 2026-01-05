@@ -129,7 +129,7 @@ impl App {
 		let [title, tabbar] = tab_layout.areas(tabs);
 
 		let tabs_border = Block::bordered()
-			.border_type(ratatui::widgets::BorderType::Rounded)
+			.border_type(crate::ui::BORDER_STYLE)
 			.gray();
 		let t = Tabs::new(AppTabs::titles())
 			.block(tabs_border)

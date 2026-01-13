@@ -129,7 +129,6 @@ impl Provider {
 			self.sink.buffer.set(data);
 		} else {
 			log::warn!("song '{song}' not preloaded, can't play");
-			self.tx.send(Op::Load(song)).ignore();
 			self.sink.buffer.set(Vec::new());
 		}
 	}
@@ -276,15 +275,12 @@ impl Queue<sub::Song> for Provider {
 	}
 	fn enqueue(&self, x: sub::Song) {
 		self.queue.insert(self.queue.len(), x);
-		self.tx.send(Op::Preload).ignore();
 	}
 	fn enqueue_next(&self, x: sub::Song) {
 		self.queue.insert(self.queue.position() + 1, x);
-		self.tx.send(Op::Preload).ignore();
 	}
 	fn enqueue_at(&self, index: usize, x: sub::Song) {
 		self.queue.insert(index, x);
-		self.tx.send(Op::Preload).ignore();
 	}
 	fn dequeue(&self, index: usize) {
 		self.queue.remove(index);
@@ -300,8 +296,6 @@ enum Op {
 	RefreshArtists,
 	RefreshAlbums,
 	RefreshSongs,
-	Preload,
-	Load(sub::Id),
 	Search(String),
 	Scrobble(sub::Id),
 }
@@ -331,40 +325,25 @@ impl ProviderWorker {
 		let _queue = self.queue.clone();
 		let _working = self.working.clone();
 		let _preload = self.cfg.player.preload;
-		let (tx, mut rx) = tokio::sync::mpsc::channel(10);
 		tokio::spawn(async move {
 			loop {
-				tokio::select! {
-					biased;
-
-					res = rx.recv() => match res {
-						None => break,
-						Some(None) => {}, // just wake up
-						Some(Some(id)) => {
-							_working.set(true);
-							Self::preload(id, &_client, &_sink, &_queue).await;
-							_working.set(false);
-						},
-					},
-
-					_ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {},
-
-				}
-
-				_working.set(true);
 				for i in 0.._preload {
-					if let Some(song) = _queue.get(_queue.position() + i) {
+					if let Some(song) = _queue.get(_queue.position() + i)
+						&& !sub::cache::data().contains(&song.id)
+					{
+						_working.set(true);
 						Self::preload(song.id, &_client, &_sink, &_queue).await;
+						_working.set(false);
+						break;
 					}
 				}
-				_working.set(false);
+
+				tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 			}
 		});
 
 		while let Some(op) = self.rx.recv().await {
 			match op {
-				Op::Preload => tx.send(None).await.ignore(),
-				Op::Load(id) => tx.send(Some(id)).await.ignore(),
 				Op::RefreshLikes => {
 					self.reload_likes().await;
 					last_fetch = std::time::SystemTime::now();

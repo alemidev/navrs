@@ -27,6 +27,15 @@ fn main() {
 		Err(e) => return println!("invalid config: {e}"),
 	};
 
+	if let Some(cache_path) = cfg.cache.location.as_ref() {
+		if let Err(e) = std::fs::create_dir_all(cache_path) {
+			eprintln!("[!] could not create cache dir: {e}");
+			return;
+		}
+
+		let _ = sub::cache::DATA_CACHE_PATH.set(cache_path.clone());
+	}
+
 	let paused = crate::ext::atomic::Flag::new(false);
 
 	let sink = audio::sink::AudioSink::init(paused.clone())

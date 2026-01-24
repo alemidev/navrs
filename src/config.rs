@@ -9,6 +9,9 @@ pub struct Config {
 	#[serde(default)]
 	pub player: PlayerConfig,
 
+	#[serde(default)]
+	pub cache: CacheConfig,
+
 	// #[serde(default)]
 	// pub transcoding: TranscodingConfig,
 }
@@ -38,6 +41,14 @@ pub struct PlayerConfig {
 
 	#[serde_inline_default(5)]
 	pub preload: usize,
+}
+
+#[serde_inline_default::serde_inline_default]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
+#[serde(rename_all = "kebab-case")]
+pub struct CacheConfig {
+	#[serde(default)]
+	pub location: Option<String>,
 }
 
 // #[serde_inline_default::serde_inline_default]

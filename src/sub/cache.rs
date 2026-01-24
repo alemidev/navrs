@@ -73,6 +73,9 @@ impl Cache<Song> for DashMap<Id, Song> {
 	}
 }
 
+// TODO ugly af way to pass a config here....
+pub static DATA_CACHE_PATH: OnceLock<String> = OnceLock::new();
+
 
 pub fn data() -> &'static impl Cache<Vec<f32>, Error =  submarine::SubsonicError, Fetcher = submarine::Client> {
 	static DATA_CACHE: OnceLock<DashMap<Id, Vec<f32>>> = OnceLock::new();
@@ -93,6 +96,25 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 		self.get(id).map(|v| v.value().clone())
 	}
 	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, submarine::SubsonicError> {
+		let mut cache_path = None;
+		if let Some(cache_base) = DATA_CACHE_PATH.get() {
+			cache_path = Some(format!("{cache_base}/{id}"));
+		}
+
+		if let Some(cache_path) = cache_path.as_ref() {
+			match tokio::fs::try_exists(&cache_path).await {
+				Err(e) => log::error!("could not check if file exists: {e}"),
+				Ok(false) => {}, // not cached: must stream
+				Ok(true) => match tokio::fs::read(&cache_path).await {
+					Err(e) => log::error!("could not load cached file: {e}"),
+					Ok(data) => {
+						log::info!("song '{id}' loaded from filesystem");
+						return Ok(crate::audio::decoder::decode_mp3(&data));
+					},
+				}
+			}
+		}
+
 		log::info!("streaming song '{id}'...");
 		let song = ctx.stream(
 			StreamOptions {
@@ -103,6 +125,14 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 			Some(std::time::Duration::from_secs(300)),
 		)
 			.await?;
+
+		if let Some(cache_path) = cache_path {
+			match tokio::fs::write(cache_path, &song).await {
+				Err(e) => log::error!("could not save streamed song to disk: {e}"),
+				Ok(()) => log::info!("saved '{id}' to disk"),
+			}
+		}
+
 		Ok(crate::audio::decoder::decode_mp3(&song))
 	}
 }

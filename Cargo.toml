@@ -23,7 +23,7 @@ thiserror = "2.0"
 itertools = "0.14"
 notify-rust = "4.11"
 #submarine = "0.1"
-submarine = { git = "https://github.com/alemidev/submarine", rev = "84d2d8085c07eb0474c0c878c2a52511132c94f2" }
+submarine = { git = "https://github.com/alemidev/submarine", rev = "74b4c7b17c819272fbef5bbfc23594f139b3a699" }
 
 serde = { version = "1.0", features = ["derive"] }
 serde-inline-default = "1.0"

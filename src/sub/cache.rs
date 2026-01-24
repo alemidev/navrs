@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 use super::{Song, Id};
 
 use dashmap::DashMap;
+use submarine::api::stream::StreamOptions;
 
 // TODO omg what happened here....
 pub trait Cache<T: Clone + Sync> {
@@ -94,13 +95,12 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, submarine::SubsonicError> {
 		log::info!("streaming song '{id}'...");
 		let song = ctx.stream(
-			id,
-			None,
-			Some("subtui"),
-			None,
-			None::<String>,
-			None,
-			None
+			StreamOptions {
+				id: id.as_str(),
+				format: Some("subtui"),
+				..Default::default()
+			},
+			Some(std::time::Duration::from_secs(300)),
 		)
 			.await?;
 		Ok(crate::audio::decoder::decode_mp3(&song))

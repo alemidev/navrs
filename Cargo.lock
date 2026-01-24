@@ -3411,7 +3411,7 @@ dependencies = [
 [[package]]
 name = "submarine"
 version = "0.1.1"
-source = "git+https://github.com/alemidev/submarine?rev=84d2d8085c07eb0474c0c878c2a52511132c94f2#84d2d8085c07eb0474c0c878c2a52511132c94f2"
+source = "git+https://github.com/alemidev/submarine?rev=74b4c7b17c819272fbef5bbfc23594f139b3a699#74b4c7b17c819272fbef5bbfc23594f139b3a699"
 dependencies = [
  "cfg-if",
  "chrono",

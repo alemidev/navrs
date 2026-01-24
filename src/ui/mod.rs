@@ -15,3 +15,9 @@ pub fn modifier_magnitude(ev: &ratatui::crossterm::event::KeyEvent) -> f64 {
 
 	1.
 }
+
+const BORDER_STYLE: ratatui::widgets::BorderType = if cfg!(feature = "rounded") {
+	ratatui::widgets::BorderType::Rounded
+} else {
+	ratatui::widgets::BorderType::Plain
+};

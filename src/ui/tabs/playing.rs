@@ -18,8 +18,9 @@ impl super::Tab for PlayingTab {
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
 				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
-				KeyCode::Backspace => { self.provider.dequeue(idx); },
 				KeyCode::Esc => self.state.select(None),
+				KeyCode::Backspace => { self.provider.dequeue(idx); },
+				KeyCode::Char('D') => self.provider.reset(Vec::new()),
 				KeyCode::Char('=') => {
 					if let Some(s) = self.provider.get_at(idx) {
 						self.provider.dequeue(idx);
@@ -32,9 +33,20 @@ impl super::Tab for PlayingTab {
 						self.provider.play(song.id);
 					}
 				}
-				// TODO move up and down in queue
-				// KeyCode::PageUp => {},
-				// KeyCode::PageDown => {},
+				KeyCode::PageUp => {
+					if let Some(s) = self.provider.get_at(idx) {
+						self.provider.dequeue(idx);
+						self.provider.enqueue_at(idx.saturating_sub(1), s);
+						self.state.select_previous();
+					}
+				},
+				KeyCode::PageDown => {
+					if let Some(s) = self.provider.get_at(idx) {
+						self.provider.dequeue(idx);
+						self.provider.enqueue_at(idx.saturating_add(1), s);
+						self.state.select_next();
+					}
+				},
 				_ => {},
 			}
 		}

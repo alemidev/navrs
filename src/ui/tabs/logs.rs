@@ -65,6 +65,7 @@ impl StatefulWidget for LogsTabWidget {
 		let container = Block::bordered()
 			.title("app logs")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(crate::ui::BORDER_STYLE)
 			.dark_gray();
 
 		let logs = crate::logger::all().into_iter().rev().collect::<Vec<String>>()

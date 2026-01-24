@@ -11,6 +11,7 @@ use clap::Parser;
 
 /// A TUI Subsonic music player
 #[derive(Parser)]
+#[clap(version, author)]
 struct Cli {
 	/// path to a specific config file, otherwise searches .config/subtui/config.toml
 	#[arg(short, long)]
@@ -46,6 +47,12 @@ fn main() {
 			}
 		})
 	);
+
+	let hook = std::panic::take_hook();
+	std::panic::set_hook(Box::new(move |panic_info| {
+		ratatui::restore();
+		hook(panic_info);
+	}));
 
 	let term = ratatui::init();
 	let res = ui::App::new(provider).run(term);

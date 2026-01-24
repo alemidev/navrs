@@ -32,6 +32,7 @@ toml = "0.9"
 
 [features]
 default = []
+rounded = []
 navidrome = ["submarine/navidrome"]
 image = ["notify-rust/image"]
 
@@ -40,5 +41,4 @@ image = ["notify-rust/image"]
 opt-level = 'z'      # optimize for size
 lto = true           # enable Link Time Optimisation: don't link unused stuff
 codegen-units = 1    # reducing codegen units slows it down but allows for better optimization
-panic = 'abort'      # abort on panic: don't include code to show what went wrong in release
 strip = "symbols"    # strip symbols from binary: have fun debugging on prod! :)

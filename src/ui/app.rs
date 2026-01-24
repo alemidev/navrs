@@ -128,7 +128,9 @@ impl App {
 		let tab_layout = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(53)]);
 		let [title, tabbar] = tab_layout.areas(tabs);
 
-		let tabs_border = Block::bordered().gray();
+		let tabs_border = Block::bordered()
+			.border_type(crate::ui::BORDER_STYLE)
+			.gray();
 		let t = Tabs::new(AppTabs::titles())
 			.block(tabs_border)
 			.highlight_style(Style::new().red().bold())

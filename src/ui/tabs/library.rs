@@ -227,6 +227,7 @@ impl StatefulWidget for LibraryTabWidget {
 		let artists_block = Block::bordered()
 			.title("artists")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(crate::ui::BORDER_STYLE)
 			.style(if matches!(self.0, Area::Artists) { focused } else { unfocused });
 
 		let artists_data = self.1.into_iter().map(|x| ListItem::new(x.name)).collect::<Vec<ListItem>>();
@@ -242,6 +243,7 @@ impl StatefulWidget for LibraryTabWidget {
 		let albums_block = Block::bordered()
 			.title("albums")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(crate::ui::BORDER_STYLE)
 			.style(if matches!(self.0, Area::Albums) { focused } else { unfocused });
 
 		let albums_data = self.2
@@ -260,6 +262,7 @@ impl StatefulWidget for LibraryTabWidget {
 		let songs_block = Block::bordered()
 			.title("songs")
 			.title_alignment(ratatui::layout::HorizontalAlignment::Right)
+			.border_type(crate::ui::BORDER_STYLE)
 			.style(if matches!(self.0, Area::Songs) { focused } else { unfocused });
 
 		let songs_data = self.3

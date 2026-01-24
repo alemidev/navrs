@@ -33,6 +33,7 @@ impl Widget for Playbar {
 		let block = Block::bordered()
 			.title(title)
 			.title_alignment(ratatui::layout::HorizontalAlignment::Center)
+			.border_type(crate::ui::BORDER_STYLE)
 			.style(style);
 		let inner_playbar = block.inner(area);
 		block.render(area, buf);

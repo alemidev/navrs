@@ -29,6 +29,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde-inline-default = "1.0"
 serde_default = "0.2"
 toml = "0.9"
+symphonia = { version = "0.5.5", features = ["all-formats"] }
 
 [features]
 default = []

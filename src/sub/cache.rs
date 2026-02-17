@@ -10,6 +10,15 @@ use super::{Song, Id};
 use dashmap::DashMap;
 use submarine::api::stream::StreamOptions;
 
+#[derive(Debug, thiserror::Error)]
+pub enum SongLoadError {
+	#[error("subsonic api error: {0} - {0:?}")]
+	Submarine(#[from] submarine::SubsonicError),
+
+	#[error("decode error: {0} - {0:?}")]
+	Symphonia(#[from] symphonia::core::errors::Error),
+}
+
 // TODO omg what happened here....
 pub trait Cache<T: Clone + Sync> {
 	type Error: std::error::Error + Send;
@@ -77,13 +86,13 @@ impl Cache<Song> for DashMap<Id, Song> {
 pub static DATA_CACHE_PATH: OnceLock<String> = OnceLock::new();
 
 
-pub fn data() -> &'static impl Cache<Vec<f32>, Error =  submarine::SubsonicError, Fetcher = submarine::Client> {
+pub fn data() -> &'static impl Cache<Vec<f32>, Error = SongLoadError, Fetcher = submarine::Client> {
 	static DATA_CACHE: OnceLock<DashMap<Id, Vec<f32>>> = OnceLock::new();
 	DATA_CACHE.get_or_init(DashMap::default)
 }
 
 impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
-	type Error = submarine::SubsonicError;
+	type Error = SongLoadError;
 	type Fetcher = submarine::Client;
 
 	fn contains(&self, id: &Id) -> bool {
@@ -95,7 +104,7 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 	fn lookup(&self, id: &Id) -> Option<Vec<f32>> {
 		self.get(id).map(|v| v.value().clone())
 	}
-	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, submarine::SubsonicError> {
+	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, SongLoadError> {
 		let mut cache_path = None;
 		if let Some(cache_base) = DATA_CACHE_PATH.get() {
 			cache_path = Some(format!("{cache_base}/{id}"));
@@ -109,7 +118,7 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 					Err(e) => log::error!("could not load cached file: {e}"),
 					Ok(data) => {
 						log::info!("song '{id}' loaded from filesystem");
-						return Ok(crate::audio::decoder::decode_mp3(&data));
+						return Ok(crate::audio::decoder::decode(&data, None)?);
 					},
 				}
 			}
@@ -133,6 +142,6 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 			}
 		}
 
-		Ok(crate::audio::decoder::decode_mp3(&song))
+		Ok(crate::audio::decoder::decode(&song, None)?)
 	}
 }

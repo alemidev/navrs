@@ -62,9 +62,8 @@ pub trait Queue<T> {
 
 #[derive(Clone)]
 pub struct Provider {
-	paused: ext::atomic::Flag,
 	working: ext::atomic::Flag,
-	sink: crate::audio::sink::AudioSink<f32>,
+	player: crate::audio::sink::AudioPlayer,
 	queue: ext::atomic::Queue<sub::Song>,
 	likes: ext::atomic::Sync<Vec<sub::Song>>,
 	search: ext::atomic::Sync<Vec<sub::Song>>,
@@ -78,8 +77,7 @@ pub struct Provider {
 impl Provider {
 	pub fn create(
 		cfg: crate::config::Config,
-		sink: crate::audio::sink::AudioSink<f32>,
-		paused: ext::atomic::Flag,
+		player: crate::audio::sink::AudioPlayer,
 	) -> (Provider, ProviderWorker) {
 		let auth = submarine::auth::AuthBuilder::new(&cfg.auth.username, "v1.16.1")
 			.client_name(&cfg.player.device)
@@ -97,8 +95,7 @@ impl Provider {
 		(
 			Provider { 
 				tx,
-				paused,
-				sink: sink.clone(),
+				player: player.clone(),
 				working: working.clone(),
 				queue: queue.clone(),
 				likes: likes.clone(),
@@ -112,7 +109,7 @@ impl Provider {
 				working,
 				client,
 				queue,
-				sink,
+				player,
 				search,
 				artists,
 				albums,
@@ -124,12 +121,13 @@ impl Provider {
 	}
 
 	pub fn play(&self, song: sub::Id) {
-		self.sink.buffer.seek(0);
-		if let Some(data) = sub::cache::data().lookup(&song) {
-			self.sink.buffer.set(data);
+		if let Some((data, sample_rate)) = sub::cache::data().lookup(&song) {
+			if let Err(e) = self.player.play(data, sample_rate) {
+				log::error!("error playing song: {e}");
+			}
 		} else {
+			self.player.clear();
 			log::warn!("song '{song}' not preloaded, can't play");
-			self.sink.buffer.set(Vec::new());
 		}
 	}
 
@@ -169,7 +167,7 @@ impl Provider {
 	}
 
 	pub fn loading(&self) -> bool {
-		self.sink.buffer.len() == 0
+		self.player.buffer.len() == 0
 	}
 
 	pub fn scrobble(&self, id: sub::Id) {
@@ -179,16 +177,16 @@ impl Provider {
 
 impl Player for Provider {
 	fn set_paused(&self, val: bool) {
-		self.paused.set(val);
+		self.player.paused.set(val);
 	}
 	fn paused(&self) -> bool {
-		self.paused.get()
+		self.player.paused.get()
 	}
 }
 
 impl Buffer<f32> for Provider {
 	fn progress(&self) -> f32 {
-		let x = self.sink.buffer.pos() as f32 / self.sink.buffer.len() as f32;
+		let x = self.player.buffer.pos() as f32 / self.player.buffer.len() as f32;
 		// TODO wtf is going on here??? .clamp() doesnt work...
 		if x.is_nan() {
 			return 0.;
@@ -197,8 +195,8 @@ impl Buffer<f32> for Provider {
 		x.clamp(0., 1.)
 	}
 	fn seek(&self, pos: f32) {
-		let off = self.sink.buffer.len() as f32 * pos.clamp(0., 1.);
-		self.sink.buffer.seek(off as usize);
+		let off = self.player.buffer.len() as f32 * pos.clamp(0., 1.);
+		self.player.buffer.seek(off as usize);
 	}
 }
 
@@ -235,7 +233,7 @@ impl Queue<sub::Song> for Provider {
 				.ignore();
 		} else {
 			// no upcoming songs, clear buffer and go to silence
-			self.sink.buffer.set(Vec::new());
+			self.player.buffer.set(Vec::new());
 		}
 	}
 	fn previous(&self) {
@@ -268,8 +266,8 @@ impl Queue<sub::Song> for Provider {
 			self.play(f.id.clone());
 		} else {
 			// cleared the queue, stop playback
-			self.sink.buffer.set(Vec::new());
-			self.sink.buffer.seek(0);
+			self.player.buffer.set(Vec::new());
+			self.player.buffer.seek(0);
 		}
 		
 	}
@@ -302,7 +300,7 @@ enum Op {
 
 pub struct ProviderWorker {
 	rx: tokio::sync::mpsc::UnboundedReceiver<Op>,
-	sink: crate::audio::sink::AudioSink<f32>,
+	player: crate::audio::sink::AudioPlayer,
 	likes: ext::atomic::Sync<Vec<sub::Song>>,
 	client: submarine::Client,
 	working: ext::atomic::Flag,
@@ -321,7 +319,7 @@ impl ProviderWorker {
 
 		// TODO ughh yet another bunch of copies.......
 		let _client = self.client.clone();
-		let _sink = self.sink.clone();
+		let _sink = self.player.clone();
 		let _queue = self.queue.clone();
 		let _working = self.working.clone();
 		let _preload = self.cfg.player.preload;
@@ -404,14 +402,16 @@ impl ProviderWorker {
 		log::info!("provider worker quitting");
 	}
 
-	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioSink<f32>, queue: &ext::atomic::Queue<sub::Song>) {
+	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioPlayer, queue: &ext::atomic::Queue<sub::Song>) {
 		match sub::cache::data().prime(&id, client.clone()).await {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(()) => {
 				if let Some(s) = queue.current() && s.id == id && sink.buffer.len() == 0 {
-					let data = sub::cache::data().lookup(&id).expect("just primed");
+					let (data, sample_rate) = sub::cache::data().lookup(&id).expect("just primed");
 					log::info!("setting playback buffer");
-					sink.buffer.set(data);
+					if let Err(e) = sink.play(data, sample_rate) {
+						log::error!("error playing song: {e}");
+					}
 				}
 			},
 		}

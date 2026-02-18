@@ -36,26 +36,25 @@ fn main() {
 		let _ = sub::cache::DATA_CACHE_PATH.set(cache_path.clone());
 	}
 
-	let paused = crate::ext::atomic::Flag::new(false);
-
-	let sink = audio::sink::AudioSink::init(paused.clone())
-		.expect("could not create audio sink");
-
-	let (provider, worker) = sub::Provider::create(cfg, sink, paused);
-
-	let p = provider.clone();
-	std::thread::spawn(|| tokio::runtime::Builder::new_current_thread()
+	let rt = tokio::runtime::Builder::new_current_thread()
 		.enable_all()
 		.build()
-		.expect("could not build tokio runtime")
-		.block_on(async move {
+		.expect("could not build tokio runtime");
+
+	let player = audio::sink::AudioPlayer::new();
+
+	let (provider, worker) = sub::Provider::create(cfg, player);
+
+	let p = provider.clone();
+	std::thread::spawn(move || {
+		rt.block_on(async move {
 			tokio::spawn(async move { worker.work().await; });
 			match sub::mpris::serve(p).await {
 				Ok(()) => std::future::pending().await,
 				Err(e) => log::error!("error serving over MPRIS: {e}"),
 			}
 		})
-	);
+	});
 
 	let hook = std::panic::take_hook();
 	std::panic::set_hook(Box::new(move |panic_info| {

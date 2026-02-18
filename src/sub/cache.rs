@@ -86,25 +86,25 @@ impl Cache<Song> for DashMap<Id, Song> {
 pub static DATA_CACHE_PATH: OnceLock<String> = OnceLock::new();
 
 
-pub fn data() -> &'static impl Cache<Vec<f32>, Error = SongLoadError, Fetcher = submarine::Client> {
-	static DATA_CACHE: OnceLock<DashMap<Id, Vec<f32>>> = OnceLock::new();
+pub fn data() -> &'static impl Cache<(Vec<f32>, u32), Error = SongLoadError, Fetcher = submarine::Client> {
+	static DATA_CACHE: OnceLock<DashMap<Id, (Vec<f32>, u32)>> = OnceLock::new();
 	DATA_CACHE.get_or_init(DashMap::default)
 }
 
-impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
+impl Cache<(Vec<f32>, u32)> for DashMap<Id, (Vec<f32>, u32)> {
 	type Error = SongLoadError;
 	type Fetcher = submarine::Client;
 
 	fn contains(&self, id: &Id) -> bool {
 		self.contains_key(id)
 	}
-	fn put(&self, id: Id, val: Vec<f32>) {
+	fn put(&self, id: Id, val: (Vec<f32>, u32)) {
 		self.insert(id, val);
 	}
-	fn lookup(&self, id: &Id) -> Option<Vec<f32>> {
+	fn lookup(&self, id: &Id) -> Option<(Vec<f32>, u32)> {
 		self.get(id).map(|v| v.value().clone())
 	}
-	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Vec<f32>, SongLoadError> {
+	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<(Vec<f32>, u32), SongLoadError> {
 		let mut cache_path = None;
 		if let Some(cache_base) = DATA_CACHE_PATH.get() {
 			cache_path = Some(format!("{cache_base}/{id}"));
@@ -128,7 +128,6 @@ impl Cache<Vec<f32>> for DashMap<Id, Vec<f32>> {
 		let song = ctx.stream(
 			StreamOptions {
 				id: id.as_str(),
-				format: Some("subtui"),
 				..Default::default()
 			},
 			Some(std::time::Duration::from_secs(300)),

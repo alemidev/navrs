@@ -7,7 +7,13 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
 
-pub fn decode(data: &[u8], ext: Option<String>) -> Result<Vec<f32>, symphonia::core::errors::Error> {
+// a rather crude generic decoder implementation with symphonia
+// this is mostly copied from examples, can probably be polished a lot
+// TODO what do we do about sample rate? should we:
+//      * resample here?
+//      * try to reinit output sink? what if rate is unsupported??
+
+pub fn decode(data: &[u8], ext: Option<String>) -> Result<(Vec<f32>, u32), symphonia::core::errors::Error> {
 	let buf = std::io::Cursor::new(data.to_vec());
 	let mss = MediaSourceStream::new(Box::new(buf), Default::default());
 
@@ -34,40 +40,46 @@ pub fn decode(data: &[u8], ext: Option<String>) -> Result<Vec<f32>, symphonia::c
 		.tracks()
 		.iter()
 		.find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-		.expect("no supported audio tracks"); // TODO make it a symphonia error
+		.ok_or(symphonia::core::errors::end_of_stream_error::<Vec<f32>>().expect_err("ughh helper"))?;
 
 	// Use the default options for the decoder.
 	let dec_opts: DecoderOptions = Default::default();
 
 	// Create a decoder for the track.
 	let mut decoder = symphonia::default::get_codecs()
-		.make(&track.codec_params, &dec_opts)
-		.expect("unsupported codec");
+		.make(&track.codec_params, &dec_opts)?;
 
 	// Store the track identifier, it will be used to filter packets.
 	// let track_id = track.id;
 
-	let mut buf = None;
+	let mut buf = Vec::new();
+	let mut sample_rate = 44100;
 
 	// The decode loop.
 	loop {
 		// Get the next packet from the media format.
-		let packet = format.next_packet()?;
+		let packet = match format.next_packet() {
+			Ok(p) => p,
+			// Err(Error::IoError(_)) => break,
+			Err(e) => {
+				log::error!("error getting next packet: {e} - {e:?}");
+				break;
+			},
+		};
 
 		// // If the packet does not belong to the selected track, skip over it.
 		// if packet.track_id() != track_id {
 		// 	continue;
 		// }
-
+		
 		// Decode the packet into audio samples.
 		match decoder.decode(&packet) {
 			Ok(audio_buf) => {
-				if buf.is_none() {
-					buf = Some(SampleBuffer::<f32>::new(audio_buf.capacity() as u64, *audio_buf.spec()));
-				}
-
-				if let Some(b) = &mut buf {
-					b.copy_interleaved_ref(audio_buf);
+				sample_rate = audio_buf.spec().rate;
+				let mut sample_buf = SampleBuffer::<f32>::new(audio_buf.capacity() as u64, *audio_buf.spec());
+				sample_buf.copy_interleaved_ref(audio_buf);
+				for s in sample_buf.samples() {
+					buf.push(*s);
 				}
 			}
 			Err(Error::IoError(_)) => {
@@ -86,26 +98,6 @@ pub fn decode(data: &[u8], ext: Option<String>) -> Result<Vec<f32>, symphonia::c
 		}
 	}
 
-	match buf {
-		None => symphonia::core::errors::decode_error("no valid packets were decoded"),
-		Some(b) => Ok(b.samples().to_vec()),
-	}
+	Ok((buf, sample_rate))
 }
 
-
-pub fn decode_mp3(data: &[u8]) -> Vec<f32> {
-	let mut decoder = rmp3::Decoder::new(data);
-	let mut out = Vec::new();
-	while let Some(frame) = decoder.next() {
-		match frame {
-			rmp3::Frame::Audio(audio) => {
-				// TODO is there a push_all??
-				for sample in audio.samples() {
-					out.push(*sample);
-				}
-			}
-			rmp3::Frame::Other(_data) => {},
-		}
-	}
-	out
-}

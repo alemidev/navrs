@@ -93,6 +93,7 @@ pub struct BufferHandle<T> {
 	setter: tokio::sync::watch::Sender<Vec<T>>,
 }
 
+#[derive(Clone)]
 pub struct BufferHolder<T> {
 	idx: Index,
 	rx: tokio::sync::watch::Receiver<Vec<T>>,

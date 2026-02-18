@@ -3,7 +3,7 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::Style, widgets::{Block, List, ListItem, ListState, StatefulWidget}
 };
 
-use crate::{sub::{self, provider::Queue}, ui::modifier_magnitude};
+use crate::{sub, ui::modifier_magnitude};
 
 pub struct LibraryTab {
 	provider: sub::Provider,
@@ -68,7 +68,7 @@ impl super::Tab for LibraryTab {
 							if let Some(sel) = self.state.songs.selected()
 								&& let Some(song) = self.cached_songs.get(sel)
 							{
-								self.provider.enqueue_next(song.clone());
+								self.provider.queue.enqueue_next(song.clone());
 							}
 						},
 					}

@@ -1,84 +1,26 @@
-// TODO split this down into subfiles
-// TODO maybe the traits are pointless, just expose the atomic stuff beneath?
-
 use rand::seq::SliceRandom;
 
-use crate::{ext::{self, err::IgnorableError}, sub::{self, cache::Cache, Loader}};
-
-pub trait Player {
-	fn paused(&self) -> bool;
-	fn set_paused(&self, val: bool);
-
-	fn resume(&self) {
-		self.set_paused(false);
-	}
-
-	fn pause(&self) {
-		self.set_paused(true);
-	}
-
-	fn play_pause(&self) {
-		self.set_paused(!self.paused());
-	}
-}
-
-pub trait Buffer<T> {
-	fn progress(&self) -> f32;
-	fn seek(&self, pos: f32);
-
-	#[allow(unused)]
-	fn is_empty(&self) -> bool {
-		self.progress() >= 1.
-	}
-
-	fn restart(&self) {
-		self.seek(0.);
-	}
-
-	fn skip(&self, amount: f32) {
-		self.seek(self.progress() + amount.clamp(-1., 1.));
-	}
-}
-
-pub trait Queue<T> {
-	fn current(&self) -> Option<T>;
-	fn index(&self) -> usize;
-	fn set_index(&self, index: usize);
-
-	fn next(&self);
-	fn previous(&self);
-	fn reset(&self, data: Vec<T>);
-
-	fn enqueue(&self, x: T);
-	fn enqueue_next(&self, x: T);
-	#[allow(unused)]
-	fn enqueue_at(&self, index: usize, x: T);
-
-	fn get_at(&self, index: usize) -> Option<T>;
-	fn view(&self) -> Vec<T>;
-
-	fn dequeue(&self, index: usize);
-}
+use crate::{audio::api::Buffer, ext::{self, err::IgnorableError}, sub::{self, cache::Cache}};
 
 #[derive(Clone)]
 pub struct Provider {
-	working: ext::atomic::Flag,
-	player: crate::audio::sink::AudioPlayer,
-	queue: ext::atomic::Queue<sub::Song>,
-	likes: ext::atomic::Sync<Vec<sub::Song>>,
-	search: ext::atomic::Sync<Vec<sub::Song>>,
+	pub working: ext::atomic::Flag,
+	pub player: crate::audio::sink::AudioPlayer,
+	pub queue: ext::atomic::Queue<sub::Song>,
+	pub likes: ext::atomic::Sync<Vec<sub::Song>>,
+	pub search: ext::atomic::Sync<Vec<sub::Song>>,
 	// ....
 	pub artists: ext::atomic::Sync<Vec<sub::Artist>>,
 	pub albums: ext::atomic::Sync<Vec<sub::Song>>,
 	pub songs: ext::atomic::Sync<Vec<sub::Song>>,
-	tx: tokio::sync::mpsc::UnboundedSender<Op>,
+	tx: tokio::sync::mpsc::UnboundedSender<sub::worker::Op>,
 }
 
 impl Provider {
 	pub fn create(
 		cfg: crate::config::Config,
 		player: crate::audio::sink::AudioPlayer,
-	) -> (Provider, ProviderWorker) {
+	) -> (Provider, sub::worker::ProviderWorker) {
 		let auth = submarine::auth::AuthBuilder::new(&cfg.auth.username, "v1.16.1")
 			.client_name(&cfg.player.device)
 			.hashed(&cfg.auth.password);
@@ -104,7 +46,7 @@ impl Provider {
 				albums: albums.clone(),
 				songs: songs.clone(),
 			},
-			ProviderWorker {
+			sub::worker::ProviderWorker {
 				likes,
 				working,
 				client,
@@ -121,6 +63,7 @@ impl Provider {
 	}
 
 	pub fn play(&self, song: sub::Id) {
+		self.tx.send(sub::worker::Op::UpdateMPRIS).ignore();
 		if let Some((data, sample_rate)) = sub::cache::data().lookup(&song) {
 			if let Err(e) = self.player.play(data, sample_rate) {
 				log::error!("error playing song: {e}");
@@ -131,99 +74,24 @@ impl Provider {
 		}
 	}
 
-	pub fn working(&self) -> bool {
-		self.working.get()
-	}
-
-	pub fn likes(&self) -> Vec<sub::Song> {
-		self.likes.get()
-	}
-
-	pub fn search_results(&self) -> Vec<sub::Song> {
-		self.search.get()
-	}
-
 	pub fn shuffle_liked(&self) {
 		let mut queue = self.likes.get();
 		queue.shuffle(&mut rand::rng());
 		self.queue.set(queue);
-		if let Some(s) = self.current() {
+		if let Some(s) = self.queue.current() {
 			self.play(s.id);
 		}
 	}
 
-	pub fn refresh_likes(&self) {
-		self.tx.send(Op::RefreshLikes).ignore();
-	}
-
-	pub fn refresh_library(&self) {
-		self.tx.send(Op::RefreshArtists).ignore();
-		self.tx.send(Op::RefreshAlbums).ignore();
-		self.tx.send(Op::RefreshSongs).ignore();
-	}
-
-	pub fn search(&self, query: String) {
-		self.tx.send(Op::Search(query)).ignore();
-	}
-
-	pub fn loading(&self) -> bool {
-		self.player.buffer.len() == 0
-	}
-
-	pub fn scrobble(&self, id: sub::Id) {
-		self.tx.send(Op::Scrobble(id)).ignore();
-	}
-}
-
-impl Player for Provider {
-	fn set_paused(&self, val: bool) {
-		self.player.paused.set(val);
-	}
-	fn paused(&self) -> bool {
-		self.player.paused.get()
-	}
-}
-
-impl Buffer<f32> for Provider {
-	fn progress(&self) -> f32 {
-		let x = self.player.buffer.pos() as f32 / self.player.buffer.len() as f32;
-		// TODO wtf is going on here??? .clamp() doesnt work...
-		if x.is_nan() {
-			return 0.;
-		}
-
-		x.clamp(0., 1.)
-	}
-	fn seek(&self, pos: f32) {
-		let off = self.player.buffer.len() as f32 * pos.clamp(0., 1.);
-		self.player.buffer.seek(off as usize);
-	}
-}
-
-impl Queue<sub::Song> for Provider {
-	fn index(&self) -> usize {
-		self.queue.position()
-	}
-	fn set_index(&self, index: usize) {
-		self.queue.set_position(index);
-	}
-
-	fn current(&self) -> Option<sub::Song> {
-		self.queue.current()
-	}
-
-	fn get_at(&self, index: usize) -> Option<sub::Song> {
-		self.queue.get(index)
-	}
-
-	fn next(&self) {
-		if self.progress() > 0.75 && let Some(s) = self.current() {
+	pub fn go_next(&self) {
+		if self.player.progress() > 0.75 && let Some(s) = self.queue.current() {
 			self.scrobble(s.id);
 		}
 
 		self.queue.advance();
 		if let Some(s) = self.queue.current() {
 			self.play(s.id);
+			// TODO have one single updated notification
 			notify_rust::Notification::new()
 				.summary(&s.title)
 				.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
@@ -233,15 +101,16 @@ impl Queue<sub::Song> for Provider {
 				.ignore();
 		} else {
 			// no upcoming songs, clear buffer and go to silence
-			self.player.buffer.set(Vec::new());
+			self.player.clear();
 		}
 	}
-	fn previous(&self) {
+
+	pub fn go_previous(&self) {
 		// if it's the start of a song
-		if self.progress() < 0.01 {
+		if self.player.progress() < 0.01 {
 			// advance in queue, if there's anything next
-			if self.index() > 0 {
-				self.queue.set_position(self.index() - 1);
+			if self.queue.index() > 0 {
+				self.queue.set_index(self.queue.index() - 1);
 				if let Some(s) = self.queue.current() {
 					self.play(s.id);
 					notify_rust::Notification::new()
@@ -255,176 +124,39 @@ impl Queue<sub::Song> for Provider {
 			}
 		} else {
 			// restart this song
-			self.restart();
-
+			self.player.restart();
 		}
 	}
 
-	fn reset(&self, data: Vec<sub::Song>) {
+	pub fn reset(&self, data: Vec<sub::Song>) {
 		self.queue.set(data.clone());
 		if let Some(f) = data.first() {
 			self.play(f.id.clone());
 		} else {
 			// cleared the queue, stop playback
-			self.player.buffer.set(Vec::new());
-			self.player.buffer.seek(0);
+			self.player.clear();
 		}
-		
 	}
-	fn enqueue(&self, x: sub::Song) {
-		self.queue.insert(self.queue.len(), x);
+
+
+	// TODO these are not really scalable... should we just expose the Op struct?
+
+	pub fn refresh_likes(&self) {
+		self.tx.send(sub::worker::Op::RefreshLikes).ignore();
 	}
-	fn enqueue_next(&self, x: sub::Song) {
-		self.queue.insert(self.queue.position() + 1, x);
+
+	pub fn refresh_library(&self) {
+		self.tx.send(sub::worker::Op::RefreshArtists).ignore();
+		self.tx.send(sub::worker::Op::RefreshAlbums).ignore();
+		self.tx.send(sub::worker::Op::RefreshSongs).ignore();
 	}
-	fn enqueue_at(&self, index: usize, x: sub::Song) {
-		self.queue.insert(index, x);
+
+	pub fn search(&self, query: String) {
+		self.tx.send(sub::worker::Op::Search(query)).ignore();
 	}
-	fn dequeue(&self, index: usize) {
-		self.queue.remove(index);
-	}
-	fn view(&self) -> Vec<sub::Song> {
-		self.queue.view()
+
+	pub fn scrobble(&self, id: sub::Id) {
+		self.tx.send(sub::worker::Op::Scrobble(id)).ignore();
 	}
 }
 
-
-enum Op {
-	RefreshLikes,
-	RefreshArtists,
-	RefreshAlbums,
-	RefreshSongs,
-	Search(String),
-	Scrobble(sub::Id),
-}
-
-pub struct ProviderWorker {
-	rx: tokio::sync::mpsc::UnboundedReceiver<Op>,
-	player: crate::audio::sink::AudioPlayer,
-	likes: ext::atomic::Sync<Vec<sub::Song>>,
-	client: submarine::Client,
-	working: ext::atomic::Flag,
-	queue: ext::atomic::Queue<sub::Song>,
-	search: ext::atomic::Sync<Vec<sub::Song>>,
-	cfg: crate::config::Config,
-	// TODO overdoing this a bit... need a better way than 2 channels, ouchh
-	artists: ext::atomic::Sync<Vec<sub::Artist>>,
-	albums: ext::atomic::Sync<Vec<sub::Song>>,
-	songs: ext::atomic::Sync<Vec<sub::Song>>,
-}
-
-impl ProviderWorker {
-	pub async fn work(mut self) {
-		let mut last_fetch = std::time::SystemTime::now();
-
-		// TODO ughh yet another bunch of copies.......
-		let _client = self.client.clone();
-		let _sink = self.player.clone();
-		let _queue = self.queue.clone();
-		let _working = self.working.clone();
-		let _preload = self.cfg.player.preload;
-		tokio::spawn(async move {
-			loop {
-				for i in 0.._preload {
-					if let Some(song) = _queue.get(_queue.position() + i)
-						&& !sub::cache::data().contains(&song.id)
-					{
-						_working.set(true);
-						Self::preload(song.id, &_client, &_sink, &_queue).await;
-						_working.set(false);
-						break;
-					}
-				}
-
-				tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-			}
-		});
-
-		while let Some(op) = self.rx.recv().await {
-			match op {
-				Op::RefreshLikes => {
-					self.reload_likes().await;
-					last_fetch = std::time::SystemTime::now();
-				},
-				Op::Search(query) => {
-					log::info!("searching '{query}'");
-					match self.client.search3(
-						query,
-						Some(50),
-						None,
-						Some(50),
-						None,
-						Some(50),
-						None,
-						None::<String>,
-					)
-						.await
-					{
-						Err(e) => log::error!("error searching: {e}"),
-						Ok(x) => self.search.set(x.song),
-					}
-				},
-				Op::RefreshArtists => {
-					log::info!("refreshing artists...");
-					match self.client.all_artists().await {
-						Err(e) => log::error!("error loading all artists: {e}"),
-						Ok(artists) => self.artists.set(artists),
-					}
-				},
-				Op::RefreshSongs => {
-					log::info!("refreshing songs...");
-					match self.client.all_songs().await {
-						Err(e) => log::error!("error loading all songs: {e}"),
-						Ok(songs) => self.songs.set(songs),
-					}
-				},
-				Op::RefreshAlbums => {
-					log::info!("refreshing albums...");
-					match self.client.all_albums().await {
-						Err(e) => log::error!("error loading all albums: {e}"),
-						Ok(albums) => self.albums.set(albums),
-					}
-				},
-				Op::Scrobble(id) => {
-					log::info!("scrobbling play of '{id}'");
-					if let Err(e) = self.client.scrobble(vec![(id, None)], Some(true)).await {
-						log::error!("error scrobbling song: {e}");
-					}
-				},
-			}
-
-			if std::time::SystemTime::now() > last_fetch + std::time::Duration::from_secs(300) {
-				self.reload_likes().await;
-				last_fetch = std::time::SystemTime::now();
-			}
-
-		}
-		log::info!("provider worker quitting");
-	}
-
-	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioPlayer, queue: &ext::atomic::Queue<sub::Song>) {
-		match sub::cache::data().prime(&id, client.clone()).await {
-			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
-			Ok(()) => {
-				if let Some(s) = queue.current() && s.id == id && sink.buffer.len() == 0 {
-					let (data, sample_rate) = sub::cache::data().lookup(&id).expect("just primed");
-					log::info!("setting playback buffer");
-					if let Err(e) = sink.play(data, sample_rate) {
-						log::error!("error playing song: {e}");
-					}
-				}
-			},
-		}
-		if let Err(e) = sub::cache::meta().prime(&id, client.clone()).await {
-			log::error!("error preloading meta for song '{id}': {e}")
-		}
-	}
-
-	async fn reload_likes(&self) {
-		log::info!("reloading likes");
-		match self.client.get_starred(None::<String>).await {
-			Ok(data) => self.likes.set(data.song),
-			Err(e) => log::error!("error fetching likes: {e}"),
-		}
-	}
-}

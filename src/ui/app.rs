@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::{
-	sub::{self, provider::{Buffer, Player, Queue}}, ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab}
+	audio::api::{Player, Buffer}, sub, ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab}
 };
 
 const SUBTUI: &str = r#"    _   /__/_   .
@@ -61,8 +61,8 @@ impl App {
 		loop {
 			self.flip_flop = !self.flip_flop;
 
-			if self.provider.progress() >= 1. {
-				self.provider.next();
+			if self.provider.player.progress() >= 1. {
+				self.provider.go_next();
 			}
 
 			let _frame = term.draw(|frame| self.draw(frame))?;
@@ -98,11 +98,11 @@ impl App {
 									KeyCode::Char('3') => self.tab = AppTabs::Search,
 									KeyCode::Char('4') => self.tab = AppTabs::Library,
 									KeyCode::Char('5') => self.tab = AppTabs::Logs,
-									KeyCode::Char(' ') => self.provider.play_pause(),
-									KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.next(); },
-									KeyCode::Char('b') | KeyCode::Char('^') => { self.provider.previous(); }
-									KeyCode::Right => { self.provider.skip(0.01 * modifier as f32); },
-									KeyCode::Left => { self.provider.skip(-0.01 * modifier as f32); },
+									KeyCode::Char(' ') => self.provider.player.play_pause(),
+									KeyCode::Char('n') | KeyCode::Char('$') => { self.provider.go_next(); },
+									KeyCode::Char('b') | KeyCode::Char('^') => { self.provider.go_previous(); }
+									KeyCode::Right => { self.provider.player.skip(0.01 * modifier as f32); },
+									KeyCode::Left => { self.provider.player.skip(-0.01 * modifier as f32); },
 									KeyCode::Tab => self.tab = self.tab.next(),
 									_ => {}
 								}
@@ -141,7 +141,7 @@ impl App {
 		frame.render_widget(t, tabbar);
 
 		let mut subtui = Paragraph::new(SUBTUI);
-		if self.provider.working() {
+		if self.provider.working.get() {
 			if self.flip_flop {
 				subtui = subtui.dark_gray();
 			} else {

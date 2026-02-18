@@ -1,20 +1,24 @@
 use mpris_server::{
-	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, RootInterface, Server, Time, TrackId, Volume, zbus::{Result, fdo}
+	LoopStatus, Metadata, PlaybackRate, PlaybackStatus, PlayerInterface, RootInterface, Time, TrackId, Volume, zbus::{Result, fdo}
 };
 
-use crate::sub::{self, provider::{Player, Queue}};
+use crate::{audio::api::{Buffer, Player}};
 
-pub struct SubtuiPlayer(pub sub::Provider);
+fn not_implemented<T>() -> fdo::Result<T> {
+	Err(fdo::Error::NotSupported("not implemented".to_string()))
+}
 
-impl RootInterface for SubtuiPlayer {
+// TODO would be cool to impl these on the worker
+
+impl RootInterface for crate::sub::Provider {
 	async fn identity(&self) -> fdo::Result<String> {
 		Ok("subtui".into())
 	}
 
-	async fn raise(&self) -> fdo::Result<()> { Ok(()) }
+	async fn raise(&self) -> fdo::Result<()> { not_implemented() }
 	async fn can_raise(&self) -> fdo::Result<bool> { Ok(false) }
 
-	async fn quit(&self) -> fdo::Result<()> { Ok(()) }
+	async fn quit(&self) -> fdo::Result<()> { not_implemented() }
 	async fn can_quit(&self) -> fdo::Result<bool> { Ok(false) }
 
 	async fn fullscreen(&self) -> fdo::Result<bool> { Ok(false) }
@@ -22,17 +26,17 @@ impl RootInterface for SubtuiPlayer {
 	async fn can_set_fullscreen(&self) -> fdo::Result<bool> { Ok(false) }
 
 	async fn has_track_list(&self) -> fdo::Result<bool> { Ok(false) } // TODO can do this!
-	async fn desktop_entry(&self) -> fdo::Result<String> { Ok(String::new()) }
+	async fn desktop_entry(&self) -> fdo::Result<String> { Ok("subtui".to_string()) }
 
 	async fn supported_uri_schemes(&self) -> fdo::Result<Vec<String>> { Ok(Vec::new()) }
 	async fn supported_mime_types(&self) -> fdo::Result<Vec<String>> { Ok(Vec::new()) }
 }
 
-impl PlayerInterface for SubtuiPlayer {
+impl PlayerInterface for crate::sub::Provider {
 	async fn set_volume(&self, _volume: Volume) -> Result<()> { Ok(()) } // TODO need volume...
 
 	async fn metadata(&self) -> fdo::Result<Metadata> {
-		if let Some(song) = self.0.current() {
+		if let Some(song) = self.queue.current() {
 			Ok(
 				Metadata::builder()
 					.title(song.title)
@@ -47,54 +51,55 @@ impl PlayerInterface for SubtuiPlayer {
 	}
 
 	async fn next(&self) -> fdo::Result<()> {
-		self.0.next();
+		self.go_next();
 		Ok(())
 	}
 
 	async fn previous(&self) -> fdo::Result<()> {
-		self.0.previous();
+		self.go_previous();
 		Ok(())
 	}
 
 	async fn pause(&self) -> fdo::Result<()> {
-		self.0.pause();
+		self.player.pause();
 		Ok(())
 	}
 
 	async fn play_pause(&self) -> fdo::Result<()> {
-		log::info!("MPRIS play/pause!");
-		self.0.play_pause();
+		self.player.play_pause();
 		Ok(())
 	}
 
 	async fn stop(&self) -> fdo::Result<()> {
-		self.0.pause();
+		self.player.pause();
 		Ok(())
 	}
 
 	async fn play(&self) -> fdo::Result<()> {
-		self.0.resume();
+		self.player.resume();
 		Ok(())
 	}
 
-	async fn seek(&self, _offset: Time) -> fdo::Result<()> {
-		// TODO doable but annoying
+	async fn seek(&self, offset: Time) -> fdo::Result<()> {
+		if let Some(s) = self.queue.current() && let Some(d) = s.duration {
+			self.player.seek(d as f32 / offset.as_secs() as f32);
+		}
 		Ok(())
 	}
 
 	async fn set_position(&self, _track_id: TrackId, _position: Time) -> fdo::Result<()> {
-		Ok(())
+		not_implemented()
 	}
 
 	async fn open_uri(&self, _uri: String) -> fdo::Result<()> {
-		Ok(())
+		not_implemented()
 	}
 
 	async fn playback_status(&self) -> fdo::Result<PlaybackStatus> {
-		if !self.0.paused() {
-			Ok(PlaybackStatus::Playing)
-		} else {
+		if self.player.paused() {
 			Ok(PlaybackStatus::Paused)
+		} else {
+			Ok(PlaybackStatus::Playing)
 		}
 	}
 
@@ -127,7 +132,11 @@ impl PlayerInterface for SubtuiPlayer {
 	}
 
 	async fn position(&self) -> fdo::Result<Time> {
-		Ok(Time::from_secs(0))
+		if let Some(s) = self.queue.current() && let Some(d) = s.duration {
+			Ok(Time::from_secs((d as f32 * self.player.progress()) as i64))
+		} else {
+			Ok(Time::from_secs(0))
+		}
 	}
 
 	async fn minimum_rate(&self) -> fdo::Result<PlaybackRate> {
@@ -161,13 +170,5 @@ impl PlayerInterface for SubtuiPlayer {
 	async fn can_control(&self) -> fdo::Result<bool> {
 		Ok(true)
 	}
-
 }
 
-// TODO merge this into ProviderWorker probably
-pub async fn serve(provider: sub::Provider) -> Result<()> {
-	log::info!("preparing MPRIS server");
-	let _server = Server::new("dev.alemi.subtui", SubtuiPlayer(provider)).await?;
-	let _: () = std::future::pending().await;
-	Ok(())
-}

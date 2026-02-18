@@ -41,20 +41,16 @@ fn main() {
 		.build()
 		.expect("could not build tokio runtime");
 
-	let player = audio::sink::AudioPlayer::new();
+	let player = audio::AudioPlayer::new();
 
 	let (provider, worker) = sub::Provider::create(cfg, player);
 
-	let p = provider.clone();
-	std::thread::spawn(move || {
-		rt.block_on(async move {
-			tokio::spawn(async move { worker.work().await; });
-			match sub::mpris::serve(p).await {
-				Ok(()) => std::future::pending().await,
-				Err(e) => log::error!("error serving over MPRIS: {e}"),
-			}
-		})
-	});
+	let mpris = rt.block_on(
+		mpris_server::Server::new("dev.alemi.subtui", provider.clone())
+	)
+		.expect("failed creating MPRIS server");
+
+	std::thread::spawn(move || rt.block_on(worker.work(mpris)));
 
 	let hook = std::panic::take_hook();
 	std::panic::set_hook(Box::new(move |panic_info| {

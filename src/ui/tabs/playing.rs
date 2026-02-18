@@ -2,7 +2,7 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, Padding, Paragraph, Wrap}
 };
 
-use crate::sub::{self, provider::Queue};
+use crate::sub;
 
 pub struct PlayingTab {
 	provider: sub::Provider,
@@ -13,37 +13,37 @@ impl super::Tab for PlayingTab {
 	fn handle_input(&mut self, event: &ratatui::crossterm::event::Event) -> bool {
 		if let Event::Key(ev) = event {
 			let modifier = crate::ui::modifier_magnitude(ev) as usize;
-			let idx = self.state.selected().unwrap_or(self.provider.index());
+			let idx = self.state.selected().unwrap_or(self.provider.queue.index());
 			match ev.code {
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
 				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
 				KeyCode::Esc => self.state.select(None),
-				KeyCode::Backspace => { self.provider.dequeue(idx); },
+				KeyCode::Backspace => { self.provider.queue.dequeue(idx); },
 				KeyCode::Char('D') => self.provider.reset(Vec::new()),
 				KeyCode::Char('=') => {
-					if let Some(s) = self.provider.get_at(idx) {
-						self.provider.dequeue(idx);
-						self.provider.enqueue_next(s);
+					if let Some(s) = self.provider.queue.get(idx) {
+						self.provider.queue.dequeue(idx);
+						self.provider.queue.enqueue_next(s);
 					}
 				},
 				KeyCode::Enter => {
-					self.provider.set_index(idx);
-					if let Some(song) = self.provider.current() {
+					self.provider.queue.set_index(idx);
+					if let Some(song) = self.provider.queue.current() {
 						self.provider.play(song.id);
 					}
 				}
 				KeyCode::PageUp => {
-					if let Some(s) = self.provider.get_at(idx) {
-						self.provider.dequeue(idx);
-						self.provider.enqueue_at(idx.saturating_sub(1), s);
+					if let Some(s) = self.provider.queue.get(idx) {
+						self.provider.queue.dequeue(idx);
+						self.provider.queue.enqueue_at(idx.saturating_sub(1), s);
 						self.state.select_previous();
 					}
 				},
 				KeyCode::PageDown => {
-					if let Some(s) = self.provider.get_at(idx) {
-						self.provider.dequeue(idx);
-						self.provider.enqueue_at(idx.saturating_add(1), s);
+					if let Some(s) = self.provider.queue.get(idx) {
+						self.provider.queue.dequeue(idx);
+						self.provider.queue.enqueue_at(idx.saturating_add(1), s);
 						self.state.select_next();
 					}
 				},
@@ -59,10 +59,10 @@ const SCROLL_PADDING: usize = 3;
 
 impl super::Renderable for PlayingTab {
 	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
-		if self.state.selected().is_none() && self.provider.index() > SCROLL_PADDING {
-			*self.state.offset_mut() = self.provider.index() - SCROLL_PADDING;
+		if self.state.selected().is_none() && self.provider.queue.index() > SCROLL_PADDING {
+			*self.state.offset_mut() = self.provider.queue.index() - SCROLL_PADDING;
 		}
-		frame.render_stateful_widget(PlayingTabWidget(self.provider.current(), self.provider.view(), self.provider.index()), area, &mut self.state);
+		frame.render_stateful_widget(PlayingTabWidget(self.provider.queue.current(), self.provider.queue.view(), self.provider.queue.index()), area, &mut self.state);
 	}
 }
 

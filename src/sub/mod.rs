@@ -2,6 +2,7 @@ pub mod cache;
 pub mod provider;
 pub mod mpris;
 pub mod loader;
+pub mod worker;
 
 // TODO split down this file!
 pub use provider::Provider;

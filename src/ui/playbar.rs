@@ -4,7 +4,7 @@ use ratatui::{
 	widgets::{Block, Gauge, Paragraph, Widget, Wrap},
 };
 
-use crate::sub::{self, provider::{Buffer, Player, Queue}};
+use crate::{audio::api::{Player, Buffer}, sub};
 
 pub struct Playbar(pub sub::Provider);
 
@@ -13,8 +13,8 @@ impl Widget for Playbar {
 	where
 		Self: Sized,
 	{
-		let running = !self.0.paused();
-		let loading = self.0.loading();
+		let running = !self.0.player.paused();
+		let loading = self.0.player.is_empty();
 
 		let style = if loading {
 			Style::new().dark_gray()
@@ -47,7 +47,7 @@ impl Widget for Playbar {
 		])
 		.areas(up);
 
-		let song = self.0.current();
+		let song = self.0.queue.current();
 
 		Paragraph::new(
 			"artist: ".dark_gray()
@@ -87,7 +87,7 @@ impl Widget for Playbar {
 		let [now, bar, end] = Layout::horizontal([Constraint::Min(5), Constraint::Percentage(100), Constraint::Min(5)]).areas(down);
 
 		let duration = song.and_then(|s| s.duration).unwrap_or_default();
-		let current_time = (duration as f32 * self.0.progress()) as i32;
+		let current_time = (duration as f32 * self.0.player.progress()) as i32;
 		let remaining = duration - current_time;
 
 		Paragraph::new(crate::ext::format_secs_duration(current_time))
@@ -101,7 +101,7 @@ impl Widget for Playbar {
 
 		Gauge::default()
 			.gauge_style(style)
-			.ratio(self.0.progress() as f64)
+			.ratio(self.0.player.progress() as f64)
 			.label(crate::ext::format_secs_duration(remaining))
 			.render(bar, buf);
 	}

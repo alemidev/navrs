@@ -21,6 +21,9 @@ impl<T: Clone> Sync<T> {
 	pub fn set(&self, val: T) {
 		self.setter.send(val).ignore();
 	}
+	pub fn inspect<X>(&self, fun: impl FnOnce(&T) -> X) -> X {
+		fun(&self.setter.borrow())
+	}
 }
 
 
@@ -149,30 +152,29 @@ impl<T: Clone> Queue<T> {
 		let (setter, _holder) = tokio::sync::watch::channel(queue);
 		Self(Arc::new(QueueInner { setter, _holder, position: Index::new(0) }))
 	}
-	pub fn len(&self) -> usize {
-		self.0.setter.borrow().len()
-	}
+
 	pub fn current(&self) -> Option<T> {
 		self.0.setter.borrow().get(self.0.position.get()).cloned()
 	}
-	#[allow(unused)]
-	pub fn next(&self) -> Option<T> {
-		self.0.setter.borrow().get(self.0.position.get() + 1).cloned()
+	pub fn index(&self) -> usize {
+		self.0.position.get()
 	}
+	pub fn set_index(&self, pos: usize) {
+		self.0.position.set(pos);
+	}
+	pub fn len(&self) -> usize {
+		self.0.setter.borrow().len()
+	}
+
 	pub fn advance(&self) {
 		self.0.position.inc(1);
 	}
-	pub fn position(&self) -> usize {
-		self.0.position.get()
-	}
-	pub fn set_position(&self, pos: usize) {
-		self.0.position.set(pos);
-	}
+
 	pub fn set(&self, queue: Vec<T>) {
 		self.0.setter.send_replace(queue);
 		self.0.position.set(0);
 	}
-	pub fn remove(&self, pos: usize) {
+	pub fn dequeue(&self, pos: usize) {
 		if pos >= self.len() {
 			return;
 		}
@@ -182,13 +184,19 @@ impl<T: Clone> Queue<T> {
 		}
 	}
 
-	pub fn insert(&self, pos: usize, val: T) {
+	pub fn enqueue_at(&self, pos: usize, val: T) {
 		let idx = self.0.position.get();
 		// TODO load-bearing .insert() ...
 		self.0.setter.send_modify(|data| data.insert(pos.min(data.len()), val));
 		if pos <= idx {
 			self.0.position.set(idx + 1);
 		}
+	}
+	pub fn enqueue_next(&self, val: T) {
+		self.enqueue_at(self.index() + 1, val);
+	}
+	pub fn enqueue(&self, val: T) {
+		self.enqueue_at(self.len(), val);
 	}
 
 	pub fn get(&self, pos: usize) -> Option<T> {

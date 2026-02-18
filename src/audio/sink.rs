@@ -24,8 +24,8 @@ pub enum AudioSinkError {
 
 #[derive(Clone)]
 pub struct AudioPlayer {
-	pub buffer: crate::ext::atomic::BufferHandle<f32>,
-	pub paused: crate::ext::atomic::Flag,
+	buffer: crate::ext::atomic::BufferHandle<f32>,
+	paused: crate::ext::atomic::Flag,
 	dev: Arc<cpal::Device>,
 	stream: Arc<std::sync::Mutex<Option<cpal::Stream>>>,
 	store: Arc<crate::ext::atomic::BufferHolder<f32>>,
@@ -46,6 +46,10 @@ impl AudioPlayer {
 			stream: Arc::new(std::sync::Mutex::new(None)),
 			store: Arc::new(buf_rx),
 		}
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.buffer.len() == 0
 	}
 
 	pub fn play(&self, data: Vec<f32>, sample_rate: u32) -> Result<(), AudioSinkError> {
@@ -100,3 +104,28 @@ impl AudioPlayer {
 	}
 }
 
+impl super::api::Player for AudioPlayer {
+	fn paused(&self) -> bool {
+		self.paused.get()
+	}
+
+	fn set_paused(&self, val: bool) {
+		self.paused.set(val);
+	}
+}
+
+impl super::api::Buffer<f32> for AudioPlayer {
+	fn progress(&self) -> f32 {
+		let x = self.buffer.pos() as f32 / self.buffer.len() as f32;
+		// TODO wtf is going on here??? .clamp() doesnt work...
+		if x.is_nan() {
+			return 0.;
+		}
+
+		x.clamp(0., 1.)
+	}
+	fn seek(&self, pos: f32) {
+		let off = self.buffer.len() as f32 * pos.clamp(0., 1.);
+		self.buffer.seek(off as usize);
+	}
+}

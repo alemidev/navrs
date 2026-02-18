@@ -2,7 +2,7 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode}, layout::{Constraint, Margin}, style::{Style, Stylize}, widgets::{Block, Padding, Row, Scrollbar, ScrollbarState, StatefulWidget, Table, TableState}
 };
 
-use crate::{sub::{self, provider::Queue}, ui::modifier_magnitude};
+use crate::{sub, ui::modifier_magnitude};
 
 pub struct LikesTab {
 	provider: sub::Provider,
@@ -40,13 +40,13 @@ impl super::Tab for LikesTab {
 					self.provider.shuffle_liked();
 				},
 				KeyCode::Char('=') => {
-					if let Some(song) = self.provider.likes().get(selected) {
-						self.provider.enqueue_next(song.clone());
+					if let Some(song) = self.provider.likes.inspect(|x| x.get(selected).cloned()) {
+						self.provider.queue.enqueue_next(song.clone());
 					}
 				},
 				KeyCode::Char('+') => {
-					if let Some(song) = self.provider.likes().get(selected) {
-						self.provider.enqueue(song.clone());
+					if let Some(song) = self.provider.likes.inspect::<Option<sub::Song>>(|x| x.get(selected).cloned()) {
+						self.provider.queue.enqueue(song.clone());
 					}
 				},
 				KeyCode::Char('r') => {
@@ -62,7 +62,7 @@ impl super::Tab for LikesTab {
 
 impl super::Renderable for LikesTab {
 	fn render(&mut self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
-		frame.render_stateful_widget(LikesTabWidget(self.provider.likes()), area, &mut self.state);
+		frame.render_stateful_widget(LikesTabWidget(self.provider.likes.get()), area, &mut self.state);
 	}
 }
 

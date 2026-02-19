@@ -1,6 +1,6 @@
 use rand::seq::SliceRandom;
 
-use crate::{audio::api::Buffer, ext::{self, err::IgnorableError}, sub::{self, cache::Cache}};
+use crate::{audio::{api::Buffer, decoder::SongData}, ext::{self, err::IgnorableError}, sub::{self, cache::Cache}};
 
 #[derive(Clone)]
 pub struct Provider {
@@ -63,7 +63,7 @@ impl Provider {
 
 	pub fn play(&self, song: sub::Id) {
 		self.update_mpris();
-		if let Some((data, sample_rate)) = sub::cache::data().lookup(&song) {
+		if let Some(SongData { data, sample_rate }) = sub::cache::data().lookup(&song) {
 			if let Err(e) = self.player.play(data, sample_rate) {
 				log::error!("error playing song: {e}");
 			}

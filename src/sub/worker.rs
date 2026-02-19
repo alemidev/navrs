@@ -1,4 +1,4 @@
-use crate::{audio::api::Player, ext, sub::{self, Loader, cache::Cache}};
+use crate::{audio::{api::Player, decoder::SongData}, ext, sub::{self, Loader, cache::Cache}};
 
 pub enum Op {
 	RefreshLikes,
@@ -118,7 +118,7 @@ impl ProviderWorker {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(()) => {
 				if let Some(s) = queue.current() && s.id == id && sink.is_empty() {
-					let (data, sample_rate) = sub::cache::data().lookup(&id).expect("just primed");
+					let SongData { data, sample_rate } = sub::cache::data().lookup(&id).expect("just primed");
 					log::info!("setting playback buffer");
 					if let Err(e) = sink.play(data, sample_rate) {
 						log::error!("error playing song: {e}");

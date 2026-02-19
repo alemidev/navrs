@@ -62,21 +62,25 @@ impl PlayerInterface for crate::sub::Provider {
 
 	async fn pause(&self) -> fdo::Result<()> {
 		self.player.pause();
+		self.update_mpris();
 		Ok(())
 	}
 
 	async fn play_pause(&self) -> fdo::Result<()> {
 		self.player.play_pause();
+		self.update_mpris();
 		Ok(())
 	}
 
 	async fn stop(&self) -> fdo::Result<()> {
 		self.player.pause();
+		self.update_mpris();
 		Ok(())
 	}
 
 	async fn play(&self) -> fdo::Result<()> {
 		self.player.resume();
+		self.update_mpris();
 		Ok(())
 	}
 
@@ -84,6 +88,7 @@ impl PlayerInterface for crate::sub::Provider {
 		if let Some(s) = self.queue.current() && let Some(d) = s.duration {
 			self.player.seek(d as f32 / offset.as_secs() as f32);
 		}
+		self.update_mpris();
 		Ok(())
 	}
 

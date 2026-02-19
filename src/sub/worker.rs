@@ -15,7 +15,6 @@ pub struct ProviderWorker {
 	pub player: crate::audio::sink::AudioPlayer,
 	pub likes: ext::atomic::Sync<Vec<sub::Song>>,
 	pub client: submarine::Client,
-	pub working: ext::atomic::Flag,
 	pub queue: ext::atomic::Queue<sub::Song>,
 	pub search: ext::atomic::Sync<Vec<sub::Song>>,
 	pub cfg: crate::config::Config,
@@ -30,20 +29,19 @@ impl ProviderWorker {
 		let mut last_fetch = std::time::SystemTime::now();
 
 		// TODO ughh yet another bunch of copies.......
+		let provider = mpris.imp().clone();
 		let _client = self.client.clone();
-		let _sink = self.player.clone();
-		let _queue = self.queue.clone();
-		let _working = self.working.clone();
 		let _preload = self.cfg.player.preload;
 		tokio::spawn(async move {
 			loop {
 				for i in 0.._preload {
-					if let Some(song) = _queue.get(_queue.index() + i)
+					if let Some(song) = provider.queue.get(provider.queue.index() + i)
 						&& !sub::cache::data().contains(&song.id)
 					{
-						_working.set(true);
-						Self::preload(song.id, &_client, &_sink, &_queue).await;
-						_working.set(false);
+						provider.working.set(true);
+						Self::preload(song.id, &_client, &provider.player, &provider.queue).await;
+						provider.working.set(false);
+						provider.update_mpris();
 						break;
 					}
 				}
@@ -54,30 +52,7 @@ impl ProviderWorker {
 
 		while let Some(op) = self.rx.recv().await {
 			match op {
-				Op::UpdateMPRIS => {
-					let mut properties = Vec::new();
-					
-					if self.player.paused() {
-						properties.push(mpris_server::Property::PlaybackStatus(mpris_server::PlaybackStatus::Paused));
-					} else {
-						properties.push(mpris_server::Property::PlaybackStatus(mpris_server::PlaybackStatus::Playing));
-					}
-
-					if let Some(song) = self.queue.current() {
-						properties.push(mpris_server::Property::Metadata(
-							mpris_server::Metadata::builder()
-								.title(song.title)
-								.artist(song.artist.map(|x| vec![x]).unwrap_or_default())
-								.album(song.album.unwrap_or_default())
-								.length(mpris_server::Time::from_secs(song.duration.unwrap_or_default() as i64))
-								.build()
-						));
-					}
-
-					if let Err(e) = mpris.properties_changed(properties).await {
-						log::error!("error updating MPRIS metadata: {e} - {e:?}");
-					}
-				},
+				Op::UpdateMPRIS => self.update_mpris(&mpris).await,
 				Op::RefreshLikes => {
 					self.reload_likes().await;
 					last_fetch = std::time::SystemTime::now();
@@ -161,6 +136,31 @@ impl ProviderWorker {
 		match self.client.get_starred(None::<String>).await {
 			Ok(data) => self.likes.set(data.song),
 			Err(e) => log::error!("error fetching likes: {e}"),
+		}
+	}
+
+	async fn update_mpris(&self, mpris: &mpris_server::Server<sub::Provider>) {
+		let mut properties = Vec::new();
+		
+		if self.player.paused() {
+			properties.push(mpris_server::Property::PlaybackStatus(mpris_server::PlaybackStatus::Paused));
+		} else {
+			properties.push(mpris_server::Property::PlaybackStatus(mpris_server::PlaybackStatus::Playing));
+		}
+
+		if let Some(song) = self.queue.current() {
+			properties.push(mpris_server::Property::Metadata(
+				mpris_server::Metadata::builder()
+					.title(song.title)
+					.artist(song.artist.map(|x| vec![x]).unwrap_or_default())
+					.album(song.album.unwrap_or_default())
+					.length(mpris_server::Time::from_secs(song.duration.unwrap_or_default() as i64))
+					.build()
+			));
+		}
+
+		if let Err(e) = mpris.properties_changed(properties).await {
+			log::error!("error updating MPRIS metadata: {e} - {e:?}");
 		}
 	}
 }

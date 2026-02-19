@@ -38,17 +38,16 @@ impl Provider {
 			Provider { 
 				tx,
 				player: player.clone(),
-				working: working.clone(),
 				queue: queue.clone(),
 				likes: likes.clone(),
 				search: search.clone(),
 				artists: artists.clone(),
 				albums: albums.clone(),
 				songs: songs.clone(),
+				working,
 			},
 			sub::worker::ProviderWorker {
 				likes,
-				working,
 				client,
 				queue,
 				player,
@@ -63,7 +62,7 @@ impl Provider {
 	}
 
 	pub fn play(&self, song: sub::Id) {
-		self.tx.send(sub::worker::Op::UpdateMPRIS).ignore();
+		self.update_mpris();
 		if let Some((data, sample_rate)) = sub::cache::data().lookup(&song) {
 			if let Err(e) = self.player.play(data, sample_rate) {
 				log::error!("error playing song: {e}");
@@ -157,6 +156,10 @@ impl Provider {
 
 	pub fn scrobble(&self, id: sub::Id) {
 		self.tx.send(sub::worker::Op::Scrobble(id)).ignore();
+	}
+
+	pub fn update_mpris(&self) {
+		self.tx.send(sub::worker::Op::UpdateMPRIS).ignore();
 	}
 }
 

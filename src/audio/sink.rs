@@ -28,6 +28,7 @@ pub struct AudioPlayer {
 	paused: crate::ext::atomic::Flag,
 	dev: Arc<cpal::Device>,
 	stream: Arc<std::sync::Mutex<Option<cpal::Stream>>>,
+	prev_sample_rate: Arc<std::sync::Mutex<u32>>,
 	store: Arc<crate::ext::atomic::BufferHolder<f32>>,
 }
 
@@ -44,6 +45,7 @@ impl AudioPlayer {
 			paused,
 			dev,
 			stream: Arc::new(std::sync::Mutex::new(None)),
+			prev_sample_rate: Arc::new(std::sync::Mutex::new(0)),
 			store: Arc::new(buf_rx),
 		}
 	}
@@ -53,47 +55,55 @@ impl AudioPlayer {
 	}
 
 	pub fn play(&self, data: Vec<f32>, sample_rate: u32) -> Result<(), AudioSinkError> {
-		self.stream.lock().expect("mutex poisoned").iter().for_each(|s| s.pause().ignore());
+		if sample_rate != *self.prev_sample_rate.lock().expect("mutex poisoned") {
+			self.stream.lock().expect("mutex poisoned").iter().for_each(|s| s.pause().ignore());
+			*self.prev_sample_rate.lock().expect("mutex poisoned") = sample_rate;
 
-		let cfgs = self.dev.supported_output_configs()?;
+			let cfgs = self.dev.supported_output_configs()?;
 
-		let mut acceptable = false;
-		for cfg in cfgs {
-			if cfg.min_sample_rate() <= sample_rate && sample_rate <= cfg.max_sample_rate() {
-				acceptable = true;
-				break;
-			}
-		}
-		if !acceptable {
-			return Err(AudioSinkError::UnsupportedSampleRate(sample_rate));
-		}
-
-		let config = cpal::StreamConfig {
-			sample_rate,
-			channels: 2, // TODO can we assume this to be true??
-			buffer_size: cpal::BufferSize::Default, // TODO do we want to change this?
-		};
-
-		self.buffer.seek(0);
-		self.buffer.set(data);
-
-		let paused = self.paused.clone();
-		let store = self.store.clone();
-		let mut stream = self.stream.lock().expect("mutex poisoned");
-		let s = self.dev.build_output_stream(
-			&config,
-			move |data: &mut [f32], _info| {
-				if paused.get() {
-					return;
+			let mut acceptable = false;
+			for cfg in cfgs {
+				if cfg.min_sample_rate() <= sample_rate && sample_rate <= cfg.max_sample_rate() {
+					acceptable = true;
+					break;
 				}
-				data.copy_from_slice(&store.read(data.len()));
-			},
-			|e| log::error!("error in stream callback: {e} - {e:?}"),
-			None,
-		)?;
+			}
+			if !acceptable {
+				return Err(AudioSinkError::UnsupportedSampleRate(sample_rate));
+			}
 
-		s.play().ignore();
-		*stream = Some(s);
+			let config = cpal::StreamConfig {
+				sample_rate,
+				channels: 2, // TODO can we assume this to be true??
+				buffer_size: cpal::BufferSize::Default, // TODO do we want to change this?
+			};
+
+			self.buffer.seek(0);
+			self.buffer.set(data);
+
+			let paused = self.paused.clone();
+			let store = self.store.clone();
+			let mut stream = self.stream.lock().expect("mutex poisoned");
+			let s = self.dev.build_output_stream(
+				&config,
+				move |data: &mut [f32], _info| {
+					if paused.get() {
+						return;
+					}
+					data.copy_from_slice(&store.read(data.len()));
+				},
+				|e| log::error!("error in stream callback: {e} - {e:?}"),
+				None,
+			)?;
+
+			s.play().ignore();
+			*stream = Some(s);
+
+		} else { // just change buffer, stream can keep existing
+
+			self.buffer.seek(0);
+			self.buffer.set(data);
+		}
 
 		Ok(())
 	}

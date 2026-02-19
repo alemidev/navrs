@@ -1,13 +1,13 @@
-# subtui
-[![Actions Status](https://github.com/alemidev/subtui/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/alemidev/subtui/actions/workflows/test.yml)
-[![Actions Status](https://github.com/alemidev/subtui/actions/workflows/release.yml/badge.svg)](https://github.com/alemidev/subtui/actions/workflows/release.yml)
-[![GitHub last commit](https://img.shields.io/github/last-commit/alemidev/subtui)](https://github.com/alemidev/subtui/commits/dev/)
+# navrs
+[![Actions Status](https://github.com/alemidev/navrs/actions/workflows/test.yml/badge.svg?branch=dev)](https://github.com/alemidev/navrs/actions/workflows/test.yml)
+[![Actions Status](https://github.com/alemidev/navrs/actions/workflows/release.yml/badge.svg)](https://github.com/alemidev/navrs/actions/workflows/release.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/alemidev/navrs)](https://github.com/alemidev/navrs/commits/dev/)
 > terminal music player for subsonic
 
-![demo-gif](https://cdn.alemi.dev/proj/subtui/demo-20260104.gif)
+![demo-gif](https://cdn.alemi.dev/proj/navrs/demo-20260104.gif)
 
 ## usage
-before running `subtui` you must configure your credentials: in `$HOME/.config/subtui/config.toml` manage subtui configuration:
+before running `navrs` you must configure your credentials: in `$HOME/.config/navrs/config.toml` manage navrs configuration:
 
 ```toml
 [server]
@@ -18,11 +18,11 @@ username = "your-username"
 password = "your-password"
 
 [player]
-device = "subtui" # optional
+device = "navrs" # optional
 preload = 5 # optional
 ```
 
-then just running `subtui` will start the TUI and load your favorites
+then just running `navrs` will start the TUI and load your favorites
 
 ### keybinds
  * `q`: exit

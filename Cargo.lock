@@ -2036,6 +2036,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "navrs"
+version = "0.2.2"
+dependencies = [
+ "clap",
+ "cpal",
+ "dashmap",
+ "itertools 0.14.0",
+ "log",
+ "mpris-server",
+ "notify-rust",
+ "rand 0.9.2",
+ "ratatui",
+ "serde",
+ "serde-inline-default",
+ "serde_default",
+ "submarine",
+ "symphonia",
+ "thiserror 2.0.17",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3435,29 +3458,6 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
-
-[[package]]
-name = "subtui"
-version = "0.2.1"
-dependencies = [
- "clap",
- "cpal",
- "dashmap",
- "itertools 0.14.0",
- "log",
- "mpris-server",
- "notify-rust",
- "rand 0.9.2",
- "ratatui",
- "serde",
- "serde-inline-default",
- "serde_default",
- "submarine",
- "symphonia",
- "thiserror 2.0.17",
- "tokio",
- "toml",
-]
 
 [[package]]
 name = "symphonia"

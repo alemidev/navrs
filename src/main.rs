@@ -13,7 +13,7 @@ use clap::Parser;
 #[derive(Parser)]
 #[clap(version, author)]
 struct Cli {
-	/// path to a specific config file, otherwise searches .config/subtui/config.toml
+	/// path to a specific config file, otherwise searches .config/navrs/config.toml
 	#[arg(short, long)]
 	config: Option<std::path::PathBuf>,
 }
@@ -46,7 +46,7 @@ fn main() {
 	let (provider, worker) = sub::Provider::create(cfg, player);
 
 	let mpris = rt.block_on(
-		mpris_server::Server::new("dev.alemi.subtui", provider.clone())
+		mpris_server::Server::new("dev.alemi.navrs", provider.clone())
 	)
 		.expect("failed creating MPRIS server");
 
@@ -74,7 +74,7 @@ fn default_config_path(force: Option<std::path::PathBuf>) -> std::path::PathBuf 
 
 	let mut out = std::path::PathBuf::from_str(&home).unwrap(); // infallible
 	out.push(".config");
-	out.push("subtui");
+	out.push("navrs");
 	out.push("config.toml");
 	out
 }

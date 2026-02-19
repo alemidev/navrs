@@ -95,7 +95,7 @@ impl Provider {
 				.summary(&s.title)
 				.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
 				// .urgency(notify_rust::Urgency::Low)
-				.appname("subtui")
+				.appname("navrs")
 				.show()
 				.ignore();
 		} else {
@@ -116,7 +116,7 @@ impl Provider {
 						.summary(&s.title)
 						.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
 						// .urgency(notify_rust::Urgency::Low)
-						.appname("subtui")
+						.appname("navrs")
 						.show()
 						.ignore();
 				}

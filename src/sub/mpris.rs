@@ -12,7 +12,7 @@ fn not_implemented<T>() -> fdo::Result<T> {
 
 impl RootInterface for crate::sub::Provider {
 	async fn identity(&self) -> fdo::Result<String> {
-		Ok("subtui".into())
+		Ok("navrs".into())
 	}
 
 	async fn raise(&self) -> fdo::Result<()> { not_implemented() }
@@ -26,7 +26,7 @@ impl RootInterface for crate::sub::Provider {
 	async fn can_set_fullscreen(&self) -> fdo::Result<bool> { Ok(false) }
 
 	async fn has_track_list(&self) -> fdo::Result<bool> { Ok(false) } // TODO can do this!
-	async fn desktop_entry(&self) -> fdo::Result<String> { Ok("subtui".to_string()) }
+	async fn desktop_entry(&self) -> fdo::Result<String> { Ok("navrs".to_string()) }
 
 	async fn supported_uri_schemes(&self) -> fdo::Result<Vec<String>> { Ok(Vec::new()) }
 	async fn supported_mime_types(&self) -> fdo::Result<Vec<String>> { Ok(Vec::new()) }

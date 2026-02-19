@@ -36,7 +36,7 @@ pub struct AuthConfig {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, serde_default::DefaultFromSerde)]
 #[serde(rename_all = "kebab-case")]
 pub struct PlayerConfig {
-	#[serde_inline_default("subtui".to_string())]
+	#[serde_inline_default("navrs".to_string())]
 	pub device: String,
 
 	#[serde_inline_default(5)]

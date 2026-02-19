@@ -1,12 +1,12 @@
 [package]
-name = "subtui"
+name = "navrs"
 version = "0.2.2"
 edition = "2024"
 authors = [ "alemi <me@alemi.dev>" ]
-description = "subsonic client, music player in your terminal"
+description = "navidrome rust client, music player in your terminal"
 license = "GPL-3.0"
 keywords = ["cli", "tui", "audio", "subsonic", "music"]
-repository = "https://github.com/alemidev/subtui"
+repository = "https://github.com/alemidev/navrs"
 readme = "README.md"
 
 [dependencies]

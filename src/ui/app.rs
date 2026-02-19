@@ -10,8 +10,9 @@ use crate::{
 	audio::api::{Player, Buffer}, sub, ui::tabs::{AppTabs, LikesTab, PlayingTab, Renderable, library::LibraryTab, logs::LogsTab, search::SearchTab}
 };
 
-const SUBTUI: &str = r#"    _   /__/_   .
-  _\/_//_// /_// "#;
+const NAVRS: &str = r#"                 __   __  
+ |\ |  /\  \  / |__) /__` 
+ | \| /~~\  \/  |  \ .__/ "#;
 
 pub struct App {
 	provider: sub::Provider,
@@ -140,17 +141,17 @@ impl App {
 			.gray();
 		frame.render_widget(t, tabbar);
 
-		let mut subtui = Paragraph::new(SUBTUI);
+		let mut navrs = Paragraph::new(NAVRS);
 		if self.provider.working.get() {
 			if self.flip_flop {
-				subtui = subtui.dark_gray();
+				navrs = navrs.dark_gray();
 			} else {
-				subtui = subtui.red();
+				navrs = navrs.red();
 			}
 		} else {
-			subtui = subtui.red().bold();
+			navrs = navrs.red().bold();
 		};
-		frame.render_widget(subtui, title);
+		frame.render_widget(navrs, title);
 
 		self.tab().render(frame, content);
 

@@ -118,7 +118,7 @@ impl Cache<(Vec<f32>, u32)> for DashMap<Id, (Vec<f32>, u32)> {
 					Err(e) => log::error!("could not load cached file: {e}"),
 					Ok(data) => {
 						log::info!("song '{id}' loaded from filesystem");
-						return Ok(crate::audio::decoder::decode(&data, None)?);
+						return Ok(crate::audio::decoder::decode(&data)?);
 					},
 				}
 			}
@@ -141,6 +141,6 @@ impl Cache<(Vec<f32>, u32)> for DashMap<Id, (Vec<f32>, u32)> {
 			}
 		}
 
-		Ok(crate::audio::decoder::decode(&song, None)?)
+		Ok(crate::audio::decoder::decode(&song)?)
 	}
 }

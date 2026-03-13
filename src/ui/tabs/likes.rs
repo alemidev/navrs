@@ -39,6 +39,14 @@ impl super::Tab for LikesTab {
 				KeyCode::Char('?') => {
 					self.provider.shuffle_liked();
 				},
+				KeyCode::Enter => {
+					if let Some(song) = self.provider.likes.inspect(|x| x.get(selected).cloned()) {
+						self.provider.queue.enqueue_next(song.clone());
+						if self.provider.queue.len() > 1 {
+							self.provider.go_next();
+						}
+					}
+				},
 				KeyCode::Char('=') => {
 					if let Some(song) = self.provider.likes.inspect(|x| x.get(selected).cloned()) {
 						self.provider.queue.enqueue_next(song.clone());

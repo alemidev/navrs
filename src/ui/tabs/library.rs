@@ -69,6 +69,9 @@ impl super::Tab for LibraryTab {
 								&& let Some(song) = self.cached_songs.get(sel)
 							{
 								self.provider.queue.enqueue_next(song.clone());
+								if self.provider.queue.len() > 1 {
+									self.provider.go_next();
+								}
 							}
 						},
 					}

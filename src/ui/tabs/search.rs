@@ -46,6 +46,14 @@ impl super::Tab for SearchTab {
 						self.state.scroll = self.state.scroll.position(idx);
 						self.state.table.select(Some(idx.saturating_add(modifier)));
 					},
+					KeyCode::Enter => {
+						if let Some(song) = self.provider.search.inspect(|x| x.get(idx).cloned()) {
+							self.provider.queue.enqueue_next(song.clone());
+							if self.provider.queue.len() > 1 {
+								self.provider.go_next();
+							}
+						}
+					},
 					KeyCode::Char('=') => {
 						if let Some(song) = self.provider.search.inspect(|x| x.get(idx).cloned()) {
 							self.provider.queue.enqueue_next(song.clone());

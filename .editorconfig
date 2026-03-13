@@ -9,10 +9,6 @@ indent_size = 4
 [*.rs]
 indent_size = 2
 
-[*.yml]
-indent_style = space
-indent_size = 2
-
-[*.yaml]
+[*.{yml,yaml}]
 indent_style = space
 indent_size = 2

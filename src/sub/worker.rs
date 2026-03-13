@@ -54,8 +54,32 @@ impl ProviderWorker {
 			match op {
 				Op::UpdateMPRIS => self.update_mpris(&mpris).await,
 				Op::RefreshLikes => {
+					if let Some(ref p) = self.cfg.cache.liked {
+						match std::fs::read_to_string(p) {
+							Err(e) => log::error!("failed loading likes from cache: {e} - {e:?}"),
+							Ok(txt) => match toml::from_str(&txt) {
+								Err(e) => log::error!("failed parsing likes from cache: {e} - {e:?}"),
+								Ok(d) => self.likes.set(d),
+							}
+						}
+					}
+
 					self.reload_likes().await;
 					last_fetch = std::time::SystemTime::now();
+
+					if let Some(ref p) = self.cfg.cache.liked {
+						use std::io::Write;
+						match toml::to_string_pretty(&self.likes.get()) {
+							Err(e) => log::error!("failed saving likes to cache: {e} - {e:?}"),
+							Ok(txt) => match std::fs::File::create(p) {
+								Err(e) => log::error!("failed opening file to cache likes to: {e} - {e:?}"),
+								Ok(mut f) => match f.write_all(txt.as_bytes()) {
+									Err(e) => log::error!("failed serializing likes to disk: {e} - {e:?}"),
+									Ok(()) => log::info!("saved liked songs to disk"),
+								}
+							}
+						}
+					}
 				},
 				Op::Search(query) => {
 					log::info!("searching '{query}'");

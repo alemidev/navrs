@@ -49,6 +49,9 @@ pub struct PlayerConfig {
 pub struct CacheConfig {
 	#[serde(default)]
 	pub location: Option<String>,
+
+	#[serde(default)]
+	pub liked: Option<String>,
 }
 
 // #[serde_inline_default::serde_inline_default]

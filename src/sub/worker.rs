@@ -54,10 +54,10 @@ impl ProviderWorker {
 			match op {
 				Op::UpdateMPRIS => self.update_mpris(&mpris).await,
 				Op::RefreshLikes => {
-					if let Some(ref p) = self.cfg.cache.liked {
+					if let Some(ref p) = self.cfg.cache.likes {
 						match std::fs::read_to_string(p) {
 							Err(e) => log::error!("failed loading likes from cache: {e} - {e:?}"),
-							Ok(txt) => match toml::from_str(&txt) {
+							Ok(txt) => match serde_json::from_str(&txt) {
 								Err(e) => log::error!("failed parsing likes from cache: {e} - {e:?}"),
 								Ok(d) => self.likes.set(d),
 							}
@@ -67,9 +67,9 @@ impl ProviderWorker {
 					self.reload_likes().await;
 					last_fetch = std::time::SystemTime::now();
 
-					if let Some(ref p) = self.cfg.cache.liked {
+					if let Some(ref p) = self.cfg.cache.likes {
 						use std::io::Write;
-						match toml::to_string_pretty(&self.likes.get()) {
+						match serde_json::to_string_pretty(&self.likes.get()) {
 							Err(e) => log::error!("failed saving likes to cache: {e} - {e:?}"),
 							Ok(txt) => match std::fs::File::create(p) {
 								Err(e) => log::error!("failed opening file to cache likes to: {e} - {e:?}"),

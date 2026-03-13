@@ -51,7 +51,7 @@ pub struct CacheConfig {
 	pub location: Option<String>,
 
 	#[serde(default)]
-	pub liked: Option<String>,
+	pub likes: Option<String>,
 }
 
 // #[serde_inline_default::serde_inline_default]

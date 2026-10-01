@@ -63,7 +63,7 @@ impl Provider {
 
 	pub fn play(&self, song: sub::Id) {
 		self.update_mpris();
-		if let Some(SongData { data, sample_rate }) = sub::cache::data().lookup(&song) {
+		if let Some(SongData { data, sample_rate, image: _ }) = sub::cache::data().lookup(&song) {
 			if let Err(e) = self.player.play(data, sample_rate) {
 				log::error!("error playing song: {e}");
 			}

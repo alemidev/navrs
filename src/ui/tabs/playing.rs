@@ -1,12 +1,16 @@
 use ratatui::{
-	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, Padding, Paragraph, Wrap}
+	crossterm::event::{Event, KeyCode}, layout::{Constraint, Layout, Size}, style::{Style, Stylize}, text::Line, widgets::{Block, List, ListState, Padding, Paragraph, Wrap}
 };
+use ratatui_image::{Resize, picker::Picker, protocol::Protocol};
 
-use crate::sub;
+use crate::sub::{self, cache::Cache};
 
 pub struct PlayingTab {
 	provider: sub::Provider,
 	state: ListState,
+	picker: Picker,
+	last: sub::Id,
+	image: Option<Protocol>,
 }
 
 impl super::Tab for PlayingTab {
@@ -62,20 +66,66 @@ impl super::Renderable for PlayingTab {
 		if self.state.selected().is_none() && self.provider.queue.index() > SCROLL_PADDING {
 			*self.state.offset_mut() = self.provider.queue.index() - SCROLL_PADDING;
 		}
-		frame.render_stateful_widget(PlayingTabWidget(self.provider.queue.current(), self.provider.queue.view(), self.provider.queue.index()), area, &mut self.state);
+
+		let curr = self.provider.queue.current();
+
+		if let Some(ref c) = curr && let Some(data) = sub::cache::data().lookup(&c.id) {
+			if c.id != self.last {
+				self.image = None;
+
+				if let Some(i_data) = data.image {
+					let mut img_builder = image::ImageReader::new(std::io::Cursor::new(i_data.data));
+					if let Some(fmt) = i_data.format {
+						img_builder.set_format(fmt);
+					}
+					
+					match img_builder.decode() {
+						Err(e) => log::error!("could not decode cover image: {e}"),
+						Ok(dyn_img) => {
+							let font_size = self.picker.font_size();
+							let size = Size::new(
+								dyn_img.width().div_ceil(font_size.width as u32) as u16,
+								dyn_img.height().div_ceil(font_size.height as u32) as u16,
+							);
+							match self.picker.new_protocol(dyn_img, size, Resize::Fit(None)) {
+								Ok(img) => self.image = Some(img),
+								Err(e) => log::error!("error creating image protocol: {e}"),
+							}
+						}
+					}
+				}
+			}
+
+			self.last = c.id.clone();
+		}
+
+		frame.render_stateful_widget(
+			PlayingTabWidget(self.provider.queue.current(), self.provider.queue.view(), self.provider.queue.index(), self.image.clone()),
+			area,
+			&mut self.state
+		);
 	}
 }
 
 impl PlayingTab {
 	pub fn new(provider: sub::Provider) -> Self {
-		Self { provider, state: ListState::default() }
+		Self {
+			provider,
+			state: ListState::default(),
+			picker: Picker::from_query_stdio().unwrap_or_else(|err| {
+				log::error!("error querying for terminal image protocol (defaulting to halfblocks) - {err}");
+				Picker::halfblocks()
+			}),
+			last: "".to_string(),
+			image: None,
+		}
 	}
 }
 
 
 
 
-struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize);
+struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize, Option<Protocol>);
 
 impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 	type State = ListState;
@@ -121,32 +171,42 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 			.padding(Padding::new(2, 2, content.height / 5, content.height / 5))
 			.red();
 
-		let info = if let Some(song) = self.0 {
-			vec![
-				Line::from(song.title.clone().red()),
-				Line::from(song.artist.as_deref().unwrap_or("?").to_string().white()),
-				Line::from(song.album.as_deref().unwrap_or("?").to_string().gray()),
-				Line::from(""),
-				Line::from(
-					format!(
-						"#{} - {} plays",
-						song.track.unwrap_or_default(),
-						song.play_count.unwrap_or_default()
-					)
-					.gray(),
-				),
-				Line::from(format!("{} ({})", song.year.unwrap_or_default(), song.genre.unwrap_or_default()).dark_gray()),
-				Line::from(""),
-				Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
-				Line::from(if song.starred.is_some() { "starred".red() } else { "".dark_gray() }),
-			]
-		} else {
-			vec![]
-		};
+		if let Some(song) = self.0 {
+			if let Some(protocol) = self.3 {
+				use ratatui::widgets::Widget;
+				ratatui_image::Image::new(&protocol)
+					.allow_clipping(true)
+					.render(content, buf);
+			} else {
+				let info = vec![
+					Line::from(song.title.clone().red()),
+					Line::from(song.artist.as_deref().unwrap_or("?").to_string().white()),
+					Line::from(song.album.as_deref().unwrap_or("?").to_string().gray()),
+					Line::from(""),
+					Line::from(
+						format!(
+							"#{} - {} plays",
+							song.track.unwrap_or_default(),
+							song.play_count.unwrap_or_default()
+						)
+						.gray(),
+					),
+					Line::from(format!("{} ({})", song.year.unwrap_or_default(), song.genre.unwrap_or_default()).dark_gray()),
+					Line::from(""),
+					Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
+					Line::from(if song.starred.is_some() { "starred".red() } else { "".dark_gray() }),
+				];
 
-		{
+				use ratatui::widgets::Widget;
+				Paragraph::new(info)
+					.block(border)
+					.centered()
+					.wrap(Wrap { trim: true })
+					.render(content, buf);
+			}
+		} else {
 			use ratatui::widgets::Widget;
-			Paragraph::new(info)
+			Paragraph::new(vec![])
 				.block(border)
 				.centered()
 				.wrap(Wrap { trim: true })

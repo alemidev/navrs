@@ -4,7 +4,7 @@ use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::formats::probe::Hint;
 use symphonia::core::io::MediaSourceStream;
-use symphonia::core::meta::MetadataOptions;
+use symphonia::core::meta::{MetadataOptions, MetadataRevision};
 
 #[derive(Clone)]
 pub struct SongData {
@@ -13,10 +13,22 @@ pub struct SongData {
 	pub image: Option<SongImage>,
 }
 
+impl std::fmt::Debug for SongData {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "SongData {{ sample_rate: {}, image: {:?}, data: ... }}", self.sample_rate, self.image)
+	}
+}
+
 #[derive(Clone)]
 pub struct SongImage {
 	pub data: Vec<u8>,
 	pub format: Option<image::ImageFormat>,
+}
+
+impl std::fmt::Debug for SongImage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "SongImage {{ format: {:?}, data: ... }}", self.format)
+	}
 }
 
 
@@ -26,7 +38,7 @@ pub fn decode(data: &[u8]) -> Result<SongData, symphonia::core::errors::Error> {
 	let mss = MediaSourceStream::new(Box::new(buf), Default::default());
 
 	// Use the default options for metadata + format readers and decoder.
-	let meta_opts: MetadataOptions = MetadataOptions::default().limit_visual_bytes(Limit::None);
+	let meta_opts: MetadataOptions = MetadataOptions::default().limit_visual_bytes(Limit::None).limit_tag_bytes(Limit::None);
 	let fmt_opts: FormatOptions = Default::default();
 	let dec_opts: AudioDecoderOptions = Default::default();
 
@@ -50,22 +62,22 @@ pub fn decode(data: &[u8]) -> Result<SongData, symphonia::core::errors::Error> {
 
 	// TODO this only works if there's ONE image per track, however "sorting" image type by
 	// desirability is a mess...
-	if let Some(rev) = format.metadata().current() {
-		for v in rev.media.visuals.iter() {
-			image =  Some(SongImage {
-				data: v.data.to_vec(),
-				format: image::ImageFormat::from_mime_type(v.media_type.as_ref().map(|x| x.to_string()).unwrap_or_default()),
-			});
-		}
-		// per-track cover should overrule global one, if present
-		for per_track in rev.per_track.iter() {
-			for v in per_track.metadata.visuals.iter() {
-				image =  Some(SongImage {
-					data: v.data.to_vec(),
-					format: image::ImageFormat::from_mime_type(v.media_type.as_ref().map(|x| x.to_string()).unwrap_or_default()),
-				});
+	loop {
+		if let Some(rev) = format.metadata().current() {
+			let mut covers = search_for_cover_image(rev);
+			if covers.len() > 1 {
+				log::warn!("got more than 1 cover art per song, picking last one");
+			}
+			if let Some(i) = covers.pop() {
+				image = Some(i);
 			}
 		}
+
+		if format.metadata().is_latest() {
+			break;
+		}
+
+		format.metadata().pop();
 	}
 
 	// The decode loop.
@@ -86,7 +98,7 @@ pub fn decode(data: &[u8]) -> Result<SongData, symphonia::core::errors::Error> {
 		//if packet.track_id() != track_id {
 		//	continue
 		//}
-
+		
 		match decoder.decode(&packet) {
 			Ok(audio_buf) => {
 				sample_rate = audio_buf.spec().rate();
@@ -113,6 +125,30 @@ pub fn decode(data: &[u8]) -> Result<SongData, symphonia::core::errors::Error> {
 		}
 	}
 
-	Ok(SongData { data, sample_rate, image })
+	let song_data = SongData { data, sample_rate, image };
+	log::info!("decoded song: {song_data:?}");
+	Ok(song_data)
 }
 
+fn search_for_cover_image(rev: &MetadataRevision) -> Vec<SongImage> {
+	let mut out = Vec::new();
+
+	for v in rev.media.visuals.iter() {
+		out.push(SongImage {
+			data: v.data.to_vec(),
+			format: image::ImageFormat::from_mime_type(v.media_type.as_ref().map(|x| x.to_string()).unwrap_or_default()),
+		});
+	}
+
+	// per-track cover should overrule global one, if present
+	for per_track in rev.per_track.iter() {
+		for v in per_track.metadata.visuals.iter() {
+			out.push(SongImage {
+				data: v.data.to_vec(),
+				format: image::ImageFormat::from_mime_type(v.media_type.as_ref().map(|x| x.to_string()).unwrap_or_default()),
+			});
+		}
+	}
+
+	out
+}

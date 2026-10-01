@@ -96,6 +96,7 @@ impl Provider {
 				.body(&format!("{} - {}", s.artist.unwrap_or_default(), s.album.unwrap_or_default()))
 				// .urgency(notify_rust::Urgency::Low)
 				.appname("navrs")
+				.auto_icon()
 				.show()
 				.ignore();
 		} else {

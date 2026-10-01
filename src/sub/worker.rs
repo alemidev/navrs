@@ -138,11 +138,16 @@ impl ProviderWorker {
 	}
 
 	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioPlayer, queue: &ext::atomic::Queue<sub::Song>) {
-		match sub::cache::data().prime(&id, client.clone()).await {
+		let (data_task, meta_task) = tokio::join!(
+			sub::cache::data().prime(&id, client.clone()),
+			sub::cache::meta().prime(&id, client.clone()),
+		);
+
+		match data_task {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(()) => {
 				if let Some(s) = queue.current() && s.id == id && sink.is_empty() {
-					let SongData { data, sample_rate } = sub::cache::data().lookup(&id).expect("just primed");
+					let SongData { data, sample_rate, image: _ } = sub::cache::data().lookup(&id).expect("just primed");
 					log::info!("setting playback buffer");
 					if let Err(e) = sink.play(data, sample_rate) {
 						log::error!("error playing song: {e}");
@@ -150,7 +155,7 @@ impl ProviderWorker {
 				}
 			},
 		}
-		if let Err(e) = sub::cache::meta().prime(&id, client.clone()).await {
+		if let Err(e) = meta_task {
 			log::error!("error preloading meta for song '{id}': {e}")
 		}
 	}

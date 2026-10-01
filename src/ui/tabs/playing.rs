@@ -11,6 +11,7 @@ pub struct PlayingTab {
 	picker: Picker,
 	last: sub::Id,
 	image: Option<Protocol>,
+	show_info: bool,
 }
 
 impl super::Tab for PlayingTab {
@@ -19,6 +20,7 @@ impl super::Tab for PlayingTab {
 			let modifier = crate::ui::modifier_magnitude(ev) as usize;
 			let idx = self.state.selected().unwrap_or(self.provider.queue.index());
 			match ev.code {
+				KeyCode::Char('i') => self.show_info = !self.show_info,
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),
 				KeyCode::Down => self.state.select(Some(idx.saturating_add(modifier))),
@@ -82,12 +84,11 @@ impl super::Renderable for PlayingTab {
 					match img_builder.decode() {
 						Err(e) => log::error!("could not decode cover image: {e}"),
 						Ok(dyn_img) => {
-							let font_size = self.picker.font_size();
-							let size = Size::new(
-								dyn_img.width().div_ceil(font_size.width as u32) as u16,
-								dyn_img.height().div_ceil(font_size.height as u32) as u16,
-							);
-							match self.picker.new_protocol(dyn_img, size, Resize::Fit(None)) {
+							let size = Size {
+								width: area.width * 6 / 10,
+								height: area.height * 6 / 10
+							};
+							match self.picker.new_protocol(dyn_img, size, Resize::Scale(None)) {
 								Ok(img) => self.image = Some(img),
 								Err(e) => log::error!("error creating image protocol: {e}"),
 							}
@@ -100,7 +101,7 @@ impl super::Renderable for PlayingTab {
 		}
 
 		frame.render_stateful_widget(
-			PlayingTabWidget(self.provider.queue.current(), self.provider.queue.view(), self.provider.queue.index(), self.image.clone()),
+			PlayingTabWidget(self.provider.queue.current(), self.provider.queue.view(), self.provider.queue.index(), self.image.clone(), self.show_info),
 			area,
 			&mut self.state
 		);
@@ -118,6 +119,7 @@ impl PlayingTab {
 			}),
 			last: "".to_string(),
 			image: None,
+			show_info: false,
 		}
 	}
 }
@@ -125,7 +127,7 @@ impl PlayingTab {
 
 
 
-struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize, Option<Protocol>);
+struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize, Option<Protocol>, bool);
 
 impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 	type State = ListState;
@@ -171,14 +173,9 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 			.padding(Padding::new(2, 2, content.height / 5, content.height / 5))
 			.red();
 
-		if let Some(song) = self.0 {
-			if let Some(protocol) = self.3 {
-				use ratatui::widgets::Widget;
-				ratatui_image::Image::new(&protocol)
-					.allow_clipping(true)
-					.render(content, buf);
-			} else {
-				let info = vec![
+		if self.4 {
+			let lines = if let Some(song) = self.0 {
+				vec![
 					Line::from(song.title.clone().red()),
 					Line::from(song.artist.as_deref().unwrap_or("?").to_string().white()),
 					Line::from(song.album.as_deref().unwrap_or("?").to_string().gray()),
@@ -195,22 +192,33 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 					Line::from(""),
 					Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
 					Line::from(if song.starred.is_some() { "starred".red() } else { "".dark_gray() }),
-				];
+				]
+			} else {
+				vec![]
+			};
 
-				use ratatui::widgets::Widget;
-				Paragraph::new(info)
-					.block(border)
-					.centered()
-					.wrap(Wrap { trim: true })
-					.render(content, buf);
-			}
-		} else {
 			use ratatui::widgets::Widget;
-			Paragraph::new(vec![])
+			Paragraph::new(lines)
 				.block(border)
 				.centered()
 				.wrap(Wrap { trim: true })
 				.render(content, buf);
+
+		} else {
+
+			// TODO would be nice to put a box around this image but it 
+			//let block = Block::bordered().red();
+			//let inner_content = block.inner(sqr_content);
+
+			use ratatui::widgets::Widget;
+			//block.render(sqr_content, buf);
+
+			if let Some(protocol) = self.3 {
+				ratatui_image::Image::new(&protocol)
+					.allow_clipping(true)
+					.render(content, buf);
+			}
 		}
+
 	}
 }

@@ -6,17 +6,8 @@ use crate::ext::err::IgnorableError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AudioSinkError {
-	#[error("stream config error: {0} - {0:?}")]
-	DefaultStreamConfig(#[from] cpal::DefaultStreamConfigError),
-
-	#[error("error building stream: {0} - {0:?}")]
-	BuildStream(#[from] cpal::BuildStreamError),
-
-	#[error("play stream error: {0} - {0:?}")]
-	PlayStream(#[from] cpal::PlayStreamError),
-
-	#[error("supported configs error: {0} - {0:?}")]
-	SupportedStreamConfigsError(#[from] cpal::SupportedStreamConfigsError),
+	#[error("stream error: {0} - {0:?}")]
+	DefaultStreamConfig(#[from] cpal::Error),
 
 	#[error("requested sample rate {0} is not supported by host")]
 	UnsupportedSampleRate(u32),
@@ -85,7 +76,7 @@ impl AudioPlayer {
 			let store = self.store.clone();
 			let mut stream = self.stream.lock().expect("mutex poisoned");
 			let s = self.dev.build_output_stream(
-				&config,
+				config,
 				move |data: &mut [f32], _info| {
 					if paused.get() {
 						return;

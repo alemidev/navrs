@@ -36,7 +36,7 @@ impl App {
 			likes_tab: LikesTab::new(provider.clone()),
 			search_tab: SearchTab::new(provider.clone()),
 			library_tab: LibraryTab::new(provider.clone()),
-			logs_tab: LogsTab::new(),
+			logs_tab: LogsTab::new(provider.clone()),
 
 			tab: AppTabs::Playing,
 

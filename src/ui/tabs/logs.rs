@@ -5,6 +5,7 @@ use ratatui::{
 use crate::{sub::{self, cache::Cache}, ui::modifier_magnitude};
 
 pub struct LogsTab {
+	provider: sub::Provider,
 	scroll: usize,
 	scroll_state: ScrollbarState,
 }
@@ -27,7 +28,13 @@ impl super::Tab for LogsTab {
 					self.scroll_state.first();
 				},
 				KeyCode::Char('?') => {
-					log::info!("cache dump - data:{}", sub::cache::data().len());
+					log::info!(
+						"cache dump - data:{} - artists:{} - albums:{} - songs:{}",
+						sub::cache::data().len(),
+						self.provider.artists.get().len(),
+						self.provider.albums.get().len(),
+						self.provider.songs.get().len(),
+					);
 				},
 				_ => {},
 			}
@@ -44,8 +51,9 @@ impl super::Renderable for LogsTab {
 }
 
 impl LogsTab {
-	pub fn new() -> Self {
+	pub fn new(provider: sub::Provider,) -> Self {
 		Self {
+			provider,
 			scroll: 0,
 			scroll_state: ScrollbarState::default(),
 		}

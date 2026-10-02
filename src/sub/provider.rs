@@ -162,5 +162,9 @@ impl Provider {
 	pub fn update_mpris(&self) {
 		self.tx.send(sub::worker::Op::UpdateMPRIS).ignore();
 	}
+
+	pub fn star_song(&self, id: sub::Id) {
+		self.tx.send(sub::worker::Op::Star(id)).ignore();
+	}
 }
 

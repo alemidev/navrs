@@ -155,6 +155,18 @@ impl super::Tab for LibraryTab {
 						},
 					}
 				},
+				KeyCode::Char('r') => self.provider.refresh_library(),
+				KeyCode::Char('l') => match self.selected {
+					Area::Artists => {},
+					Area::Albums => {},
+					Area::Songs => {
+						if let Some(sel) = self.state.songs.selected()
+							&& let Some(song) = self.cached_songs.get(sel)
+						{
+							self.provider.star_song(song.id.clone());
+						}
+					},
+				},
 				_ => {},
 			}
 		}

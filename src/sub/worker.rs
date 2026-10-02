@@ -8,6 +8,7 @@ pub enum Op {
 	Search(String),
 	Scrobble(sub::Id),
 	UpdateMPRIS,
+	Star(sub::Id),
 }
 
 pub struct ProviderWorker {
@@ -26,6 +27,7 @@ pub struct ProviderWorker {
 
 impl ProviderWorker {
 	pub async fn work(mut self, mpris: mpris_server::Server<sub::Provider>) {
+		let empty_id_vec : Vec<String> = Vec::new();
 		let mut last_fetch = std::time::SystemTime::now();
 
 		// TODO ughh yet another bunch of copies.......
@@ -126,6 +128,13 @@ impl ProviderWorker {
 						log::error!("error scrobbling song: {e}");
 					}
 				},
+				Op::Star(id) => {
+					if let Err(e) = self.client.star(vec![id], empty_id_vec.clone(), empty_id_vec.clone()).await {
+						log::error!("error starring song: {e}");
+					} else {
+						self.reload_likes().await;
+					}
+				}
 			}
 
 			if std::time::SystemTime::now() > last_fetch + std::time::Duration::from_secs(300) {

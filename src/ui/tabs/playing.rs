@@ -43,7 +43,11 @@ impl super::Tab for PlayingTab {
 					if let Some(s) = self.provider.queue.get(idx) {
 						self.provider.queue.dequeue(idx);
 						self.provider.queue.enqueue_at(idx.saturating_sub(1), s);
-						self.state.select_previous();
+						// special case: if we're moving the one exactly after our current playing track don't
+						// change currently selected
+						if self.provider.queue.index() != idx + 1 {
+							self.state.select_previous();
+						}
 					}
 				},
 				KeyCode::PageDown => {

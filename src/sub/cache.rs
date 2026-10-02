@@ -7,7 +7,7 @@
 use std::sync::OnceLock;
 use crate::audio::decoder::SongData;
 
-use super::{Song, Id};
+use super::Id;
 
 use dashmap::DashMap;
 use submarine::api::stream::StreamOptions;
@@ -22,7 +22,7 @@ pub enum SongLoadError {
 }
 
 // TODO omg what happened here....
-pub trait Cache<T: Clone + Sync> {
+pub trait Cache<T: Clone + Sync, const SIZE: usize> {
 	type Error: std::error::Error + Send;
 	type Fetcher: Send;
 
@@ -30,6 +30,7 @@ pub trait Cache<T: Clone + Sync> {
 	fn put(&self, id: Id, val: T);
 	fn lookup(&self, id: &Id) -> Option<T>;
 	fn fetch(&self, id: &Id, ctx: Self::Fetcher) -> impl std::future::Future<Output = Result<T, Self::Error>> + std::marker::Send;
+	fn len(&self) -> usize;
 
 
 	#[allow(unused)]
@@ -61,39 +62,17 @@ pub trait Cache<T: Clone + Sync> {
 }
 
 
-pub fn meta() -> &'static impl Cache<Song, Error = submarine::SubsonicError, Fetcher = submarine::Client> {
-	static META_CACHE: OnceLock<DashMap<Id, Song>> = OnceLock::new();
-	META_CACHE.get_or_init(DashMap::default)
-}
-
-impl Cache<Song> for DashMap<Id, Song> {
-	type Error = submarine::SubsonicError;
-	type Fetcher = submarine::Client;
-
-	fn contains(&self, id: &Id) -> bool {
-		self.contains_key(id)
-	}
-	fn put(&self, id: Id, val: Song) {
-		self.insert(id, val);
-	}
-	fn lookup(&self, id: &Id) -> Option<Song> {
-		self.get(id).map(|v| v.value().clone())
-	}
-	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<Song, submarine::SubsonicError> {
-		ctx.get_song(id).await
-	}
-}
-
 // TODO ugly af way to pass a config here....
 pub static DATA_CACHE_PATH: OnceLock<String> = OnceLock::new();
 
 
-pub fn data() -> &'static impl Cache<SongData, Error = SongLoadError, Fetcher = submarine::Client> {
+// TODO is 128 too much or too little? can we set it via config?
+pub fn data() -> &'static impl Cache<SongData, 128, Error = SongLoadError, Fetcher = submarine::Client> {
 	static DATA_CACHE: OnceLock<DashMap<Id, SongData>> = OnceLock::new();
 	DATA_CACHE.get_or_init(DashMap::default)
 }
 
-impl Cache<SongData> for DashMap<Id, SongData> {
+impl<const SIZE: usize> Cache<SongData, SIZE> for DashMap<Id, SongData> {
 	type Error = SongLoadError;
 	type Fetcher = submarine::Client;
 
@@ -105,6 +84,9 @@ impl Cache<SongData> for DashMap<Id, SongData> {
 	}
 	fn lookup(&self, id: &Id) -> Option<SongData> {
 		self.get(id).map(|v| v.value().clone())
+	}
+	fn len(&self) -> usize {
+		self.len()
 	}
 	async fn fetch(&self, id: &Id, ctx: submarine::Client) -> Result<SongData, SongLoadError> {
 		let mut cache_path = None;

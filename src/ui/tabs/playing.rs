@@ -131,7 +131,7 @@ impl PlayingTab {
 
 
 
-struct PlayingTabWidget(Option<submarine::data::Child>, Vec<submarine::data::Child>, usize, Option<Protocol>, bool);
+struct PlayingTabWidget(Option<sub::Song>, Vec<sub::Song>, usize, Option<Protocol>, bool);
 
 impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 	type State = ListState;
@@ -192,10 +192,10 @@ impl ratatui::widgets::StatefulWidget for PlayingTabWidget {
 						)
 						.gray(),
 					),
-					Line::from(format!("{} ({})", song.year.unwrap_or_default(), song.genre.unwrap_or_default()).dark_gray()),
+					Line::from(format!("{}", song.year.unwrap_or_default()).dark_gray()),
 					Line::from(""),
 					Line::from(format!("{} @{}kbps", song.content_type.unwrap_or_default(), song.bit_rate.unwrap_or_default()).gray()),
-					Line::from(if song.starred.is_some() { "starred".red() } else { "".dark_gray() }),
+					Line::from(if song.starred { "starred".red() } else { "".dark_gray() }),
 				]
 			} else {
 				vec![]

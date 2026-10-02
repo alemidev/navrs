@@ -21,7 +21,7 @@ pub struct ProviderWorker {
 	pub cfg: crate::config::Config,
 	// TODO overdoing this a bit... need a better way than 2 channels, ouchh
 	pub artists: ext::atomic::Sync<Vec<sub::Artist>>,
-	pub albums: ext::atomic::Sync<Vec<sub::Song>>,
+	pub albums: ext::atomic::Sync<Vec<sub::Album>>,
 	pub songs: ext::atomic::Sync<Vec<sub::Song>>,
 }
 
@@ -98,7 +98,7 @@ impl ProviderWorker {
 						.await
 					{
 						Err(e) => log::error!("error searching: {e}"),
-						Ok(x) => self.search.set(x.song),
+						Ok(x) => self.search.set(x.song.into_iter().map(sub::Song::from).collect()),
 					}
 				},
 				Op::RefreshArtists => {
@@ -147,12 +147,7 @@ impl ProviderWorker {
 	}
 
 	async fn preload(id: sub::Id, client: &submarine::Client, sink: &crate::audio::sink::AudioPlayer, queue: &ext::atomic::Queue<sub::Song>) {
-		let (data_task, meta_task) = tokio::join!(
-			sub::cache::data().prime(&id, client.clone()),
-			sub::cache::meta().prime(&id, client.clone()),
-		);
-
-		match data_task {
+		match sub::cache::data().prime(&id, client.clone()).await {
 			Err(e) => log::error!("error preloading data for song '{id}': {e}"),
 			Ok(()) => {
 				if let Some(s) = queue.current() && s.id == id && sink.is_empty() {
@@ -164,15 +159,12 @@ impl ProviderWorker {
 				}
 			},
 		}
-		if let Err(e) = meta_task {
-			log::error!("error preloading meta for song '{id}': {e}")
-		}
 	}
 
 	async fn reload_likes(&self) {
 		log::info!("reloading likes");
 		match self.client.get_starred(None::<String>).await {
-			Ok(data) => self.likes.set(data.song),
+			Ok(data) => self.likes.set(data.song.into_iter().map(sub::Song::from).collect()),
 			Err(e) => log::error!("error fetching likes: {e}"),
 		}
 	}

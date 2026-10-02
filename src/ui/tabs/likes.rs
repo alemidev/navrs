@@ -77,7 +77,7 @@ impl super::Renderable for LikesTab {
 
 
 
-struct LikesTabWidget(Vec<submarine::data::Child>);
+struct LikesTabWidget(Vec<sub::Song>);
 
 impl StatefulWidget for LikesTabWidget {
 	type State = LikesTabState;
@@ -130,7 +130,7 @@ impl StatefulWidget for LikesTabWidget {
 	}
 }
 
-fn song_into_row<'a>(song: submarine::data::Child) -> Row<'a> {
+fn song_into_row<'a>(song: sub::Song) -> Row<'a> {
 	Row::new([
 		song.title.clone(),
 		song.artist.clone().unwrap_or_default(),

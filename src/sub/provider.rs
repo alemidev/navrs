@@ -11,7 +11,7 @@ pub struct Provider {
 	pub search: ext::atomic::Sync<Vec<sub::Song>>,
 	// ....
 	pub artists: ext::atomic::Sync<Vec<sub::Artist>>,
-	pub albums: ext::atomic::Sync<Vec<sub::Song>>,
+	pub albums: ext::atomic::Sync<Vec<sub::Album>>,
 	pub songs: ext::atomic::Sync<Vec<sub::Song>>,
 	tx: tokio::sync::mpsc::UnboundedSender<sub::worker::Op>,
 }

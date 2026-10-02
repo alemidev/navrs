@@ -16,7 +16,7 @@ impl Loader for submarine::Client {
 		let size = 50;
 
 		loop {
-			let mut res = self.search3(
+			let res = self.search3(
 				"",
 				Some(0),
 				None,
@@ -27,7 +27,9 @@ impl Loader for submarine::Client {
 				None::<String>,
 			).await?;
 			let n = res.song.len();
-			buffer.append(&mut res.song);
+			for s in res.song {
+				buffer.push(s.into());
+			}
 			offset += n;
 			if n < size {
 				break;
@@ -42,14 +44,16 @@ impl Loader for submarine::Client {
 		let mut offset = 0;
 		let size = 50;
 		loop {
-			let mut res = self.get_album_list(
+			let res = self.get_album_list(
 				submarine::api::get_album_list::Order::Random,
 				Some(size),
 				Some(offset),
 				None::<String>,
 			).await?;
 			let n = res.len();
-			buffer.append(&mut res);
+			for a in res {
+				buffer.push(a.into());
+			}
 			offset += n;
 			if n < size {
 				break;
@@ -61,8 +65,10 @@ impl Loader for submarine::Client {
 	async fn all_artists(&self) -> Result<Vec<super::Artist>, Self::Error> {
 		let mut buffer = Vec::new();
 		let res = self.get_artists(None::<String>).await?;
-		for mut index in res {
-			buffer.append(&mut index.artist);
+		for index in res {
+			for a in index.artist {
+				buffer.push(a.into());
+			}
 		}
 		Ok(buffer)
 	}

@@ -8,7 +8,7 @@ pub mod worker;
 pub use loader::Loader;
 pub use provider::Provider;
 
-pub type Id = String;
+pub type Id = std::sync::Arc<str>;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Artist {
@@ -19,7 +19,7 @@ pub struct Artist {
 impl From<submarine::data::ArtistId3> for Artist {
 	fn from(value: submarine::data::ArtistId3) -> Self {
 		Self {
-			id: value.id,
+			id: value.id.into(),
 			name: value.name,
 		}
 	}
@@ -36,9 +36,9 @@ pub struct Album {
 impl From<submarine::data::Child> for Album {
 	fn from(value: submarine::data::Child) -> Self {
 		Self {
-			id: value.id,
+			id: value.id.into(),
 			name: value.name,
-			artist_id: value.artist_id,
+			artist_id: value.artist_id.map(|i| i.into()),
 			year: value.year,
 		}
 	}
@@ -64,12 +64,12 @@ pub struct Song {
 impl From<submarine::data::Child> for Song {
 	fn from(value: submarine::data::Child) -> Self {
 		Self {
-			id: value.id,
+			id: value.id.into(),
 			title: value.title,
 			artist: value.artist,
-			artist_id: value.artist_id,
+			artist_id: value.artist_id.map(|i| i.into()),
 			album: value.album,
-			album_id: value.album_id,
+			album_id: value.album_id.map(|i| i.into()),
 			year: value.year,
 			track: value.track,
 			duration: value.duration,

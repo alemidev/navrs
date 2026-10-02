@@ -111,7 +111,7 @@ impl<const SIZE: usize> Cache<SongData, SIZE> for DashMap<Id, SongData> {
 		log::info!("streaming song '{id}'...");
 		let song = ctx.stream(
 			StreamOptions {
-				id: id.as_str(),
+				id: id.as_ref(),
 				..Default::default()
 			},
 			Some(std::time::Duration::from_secs(300)),

@@ -27,7 +27,7 @@ pub struct ProviderWorker {
 
 impl ProviderWorker {
 	pub async fn work(mut self, mpris: mpris_server::Server<sub::Provider>) {
-		let empty_id_vec : Vec<String> = Vec::new();
+		let empty_id_vec : Vec<&str> = Vec::new();
 		let mut last_fetch = std::time::SystemTime::now();
 
 		// TODO ughh yet another bunch of copies.......
@@ -124,12 +124,12 @@ impl ProviderWorker {
 				},
 				Op::Scrobble(id) => {
 					log::info!("scrobbling play of '{id}'");
-					if let Err(e) = self.client.scrobble(vec![(id, None)], Some(true)).await {
+					if let Err(e) = self.client.scrobble(vec![(id.as_ref(), None)], Some(true)).await {
 						log::error!("error scrobbling song: {e}");
 					}
 				},
 				Op::Star(id) => {
-					if let Err(e) = self.client.star(vec![id], empty_id_vec.clone(), empty_id_vec.clone()).await {
+					if let Err(e) = self.client.star(vec![id.as_ref()], empty_id_vec.clone(), empty_id_vec.clone()).await {
 						log::error!("error starring song: {e}");
 					} else {
 						self.reload_likes().await;

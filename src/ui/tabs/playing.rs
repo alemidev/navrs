@@ -121,7 +121,7 @@ impl PlayingTab {
 				log::error!("error querying for terminal image protocol (defaulting to halfblocks) - {err}");
 				Picker::halfblocks()
 			}),
-			last: "".to_string(),
+			last: "".into(),
 			image: None,
 			show_info: false,
 		}

@@ -2,7 +2,7 @@ use ratatui::{
 	crossterm::event::{Event, KeyCode}, layout::Margin, style::{Style, Stylize}, text::Line, widgets::{Block, Paragraph, Scrollbar, ScrollbarState, StatefulWidget, Widget, Wrap}
 };
 
-use crate::ui::modifier_magnitude;
+use crate::{sub::{self, cache::Cache}, ui::modifier_magnitude};
 
 pub struct LogsTab {
 	scroll: usize,
@@ -25,6 +25,9 @@ impl super::Tab for LogsTab {
 				KeyCode::Esc => {
 					self.scroll = 0;
 					self.scroll_state.first();
+				},
+				KeyCode::Char('?') => {
+					log::info!("cache dump - data:{}", sub::cache::data().len());
 				},
 				_ => {},
 			}

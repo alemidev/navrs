@@ -20,6 +20,11 @@ impl super::Tab for PlayingTab {
 			let modifier = crate::ui::modifier_magnitude(ev) as usize;
 			let idx = self.state.selected().unwrap_or(self.provider.queue.index());
 			match ev.code {
+				KeyCode::Char('!') => {
+					if let Some(ref curr) = self.provider.queue.current() {
+						self.provider.share(curr.id.clone());
+					}
+				},
 				KeyCode::Char('i') => self.show_info = !self.show_info,
 				KeyCode::Char('s') => self.provider.shuffle_liked(),
 				KeyCode::Up => self.state.select(Some(idx.saturating_sub(modifier))),

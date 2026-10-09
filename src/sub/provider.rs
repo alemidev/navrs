@@ -166,5 +166,9 @@ impl Provider {
 	pub fn star_song(&self, id: sub::Id) {
 		self.tx.send(sub::worker::Op::Star(id)).ignore();
 	}
+
+	pub fn share(&self, id: sub::Id) {
+		self.tx.send(sub::worker::Op::Share(id)).ignore();
+	}
 }
 

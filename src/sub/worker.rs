@@ -9,6 +9,7 @@ pub enum Op {
 	Scrobble(sub::Id),
 	UpdateMPRIS,
 	Star(sub::Id),
+	Share(sub::Id),
 }
 
 pub struct ProviderWorker {
@@ -29,6 +30,13 @@ impl ProviderWorker {
 	pub async fn work(mut self, mpris: mpris_server::Server<sub::Provider>) {
 		let empty_id_vec : Vec<&str> = Vec::new();
 		let mut last_fetch = std::time::SystemTime::now();
+		let mut clipboard = match arboard::Clipboard::new() {
+			Ok(c) => Some(c),
+			Err(e) => {
+				log::error!("could not get system clipboard handle: {e}");
+				None
+			}
+		};
 
 		// TODO ughh yet another bunch of copies.......
 		let provider = mpris.imp().clone();
@@ -133,6 +141,20 @@ impl ProviderWorker {
 						log::error!("error starring song: {e}");
 					} else {
 						self.reload_likes().await;
+					}
+				}
+				Op::Share(id) => {
+					let expiry = chrono::Utc::now() + std::time::Duration::from_hours(24);
+					match self.client.create_share(id.to_string(), Some(format!("listen until {expiry}")), Some(expiry.timestamp_millis() as usize)).await {
+						Err(e) => log::error!("could not share song: {e}"),
+						Ok(mut shares) => if let Some(share) = shares.pop() {
+							log::info!("created song share at {}", share.url);
+							if let Some(c) = clipboard.as_mut() {
+								if let Err(e) = c.set_text(share.url) {
+									log::error!("could not set clipboard content: {e}");
+								}
+							}
+						}
 					}
 				}
 			}

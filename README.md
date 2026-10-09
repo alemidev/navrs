@@ -43,6 +43,4 @@ $ cargo build --release
 ```
 
 ## credits
-thanks to all subsonic clients, they either suck or don't sync too well or are super annoying to compile and buggy
-
-making my own, rolled this in one day, aha sorry flex but srsly please make better players  c':
+all desktop subsonic client kinda suck IMO, so i made an even worse one which at least does exactly what i want. enjoy ✨

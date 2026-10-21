@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: sudo apt update
-      - run: sudo apt install -y libasound2-dev # for cpal
+      - run: sudo apt install -y libasound2-dev chafa # for cpal
       - run: cargo build --verbose
       - run: cargo test --verbose
   build:
@@ -26,7 +26,7 @@ jobs:
       matrix:
         platform:
           - runner: ubuntu-latest
-            pre-build: sudo apt update; sudo apt install -y libasound2-dev
+            pre-build: sudo apt update; sudo apt install -y libasound2-dev chafa
             target: linux-x64-gnu
             ext:
           - runner: windows-latest
